@@ -40,6 +40,9 @@ func NewSSSHConnection(device *Device, cfg *config.Config) (*SSHConnection, erro
 	if legacyCiphers {
 		sshConfig.SetDefaults()
 		sshConfig.Ciphers = append(sshConfig.Ciphers, "aes128-cbc", "3des-cbc")
+		sshConfig.Ciphers = append(sshConfig.Ciphers, "aes128-cbc", "3des-cbc")
+                sshConfig.KeyExchanges = append(sshConfig.KeyExchanges, "diffie-hellman-group1-sha1")
+                sshConfig.MACs = append(sshConfig.MACs, "hmac-sha1")
 	}
 
 	device.Auth(sshConfig)
