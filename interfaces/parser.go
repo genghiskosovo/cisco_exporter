@@ -11,7 +11,7 @@ import (
 
 // Parse parses cli output and tries to find interfaces with related stats
 func (c *interfaceCollector) Parse(ostype string, output string) ([]Interface, error) {
-	if ostype != rpc.IOSXE && ostype != rpc.NXOS && ostype != rpc.IOS {
+	if ostype != rpc.IOSXE && ostype != rpc.NXOS && ostype != rpc.IOS && ostype != rpc.IOSXR {
 		return nil, errors.New("'show interface' is not implemented for " + ostype)
 	}
 	items := []Interface{}
