@@ -14,6 +14,8 @@ const (
 	IOSXE string = "IOSXE"
 	NXOS  string = "NXOS"
 	IOS   string = "IOS"
+	IOSXR string = "IOSXR"
+
 )
 
 // Client sends commands to a Cisco device
@@ -43,6 +45,8 @@ func (c *Client) Identify() error {
 		c.OSType = NXOS
 	case strings.Contains(output, "IOS Software"):
 		c.OSType = IOS
+	case strings.Contains(output, "iosxr"):
+		c.OSType = IOSXR
 	default:
 		return errors.New("Unknown OS")
 	}

@@ -16,6 +16,7 @@ var (
 	receivedPrefixesDesc *prometheus.Desc
 	inputMessagesDesc    *prometheus.Desc
 	outputMessagesDesc   *prometheus.Desc
+	bgpcmd string
 )
 
 func init() {
@@ -49,10 +50,17 @@ func (*bgpCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect collects metrics from Cisco
 func (c *bgpCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
-	out, err := client.RunCommand("show bgp all summary")
+	if client.OSType == "IOSXR" {
+		bgpcmd = "show bgp all unicast summary"
+	} else {
+		bgpcmd = "show bgp all summary"
+	}
+	
+	out, err := client.RunCommand(bgpcmd)
 	if err != nil {
 		return err
 	}
+
 	items, err := c.Parse(client.OSType, out)
 	if err != nil {
 		if client.Debug {
