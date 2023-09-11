@@ -74,7 +74,13 @@ func (c *factsCollector) CollectVersion(client *rpc.Client, ch chan<- prometheus
 
 // CollectMemory collects memory informations from Cisco
 func (c *factsCollector) CollectMemory(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
-	out, err := client.RunCommand("show process memory")
+	if client.OSType == "IOSXR" {
+		memorycmd = "show memory summary"
+	} else {
+		memorycmd = "show process memory"
+	}	
+	
+	out, err := client.RunCommand(memorycmd)
 	if err != nil {
 		return err
 	}
