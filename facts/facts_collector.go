@@ -20,6 +20,7 @@ var (
 	cpuFiveSecondsDesc *prometheus.Desc
 	cpuInterruptsDesc  *prometheus.Desc
 	cpuFiveMinutesDesc *prometheus.Desc
+	memorycmd string
 )
 
 func init() {

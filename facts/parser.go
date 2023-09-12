@@ -11,7 +11,7 @@ import (
 
 // ParseVersion parses cli output and tries to find the version number of the running OS
 func (c *factsCollector) ParseVersion(ostype string, output string) (VersionFact, error) {
-	if ostype != rpc.IOSXE && ostype != rpc.NXOS && ostype != rpc.IOS && != rpc.IOSXR {
+	if ostype != rpc.IOSXE && ostype != rpc.NXOS && ostype != rpc.IOS && ostype != rpc.IOSXR {
 		return VersionFact{}, errors.New("'show version' is not implemented for " + ostype)
 	}
 	versionRegexp := make(map[string]*regexp.Regexp)
@@ -32,7 +32,7 @@ func (c *factsCollector) ParseVersion(ostype string, output string) (VersionFact
 
 // ParseMemory parses cli output and tries to find current memory usage
 func (c *factsCollector) ParseMemory(ostype string, output string) ([]MemoryFact, error) {
-	if ostype != rpc.IOSXE && ostype != rpc.IOS && != rpc.IOSXR {
+	if ostype != rpc.IOSXE && ostype != rpc.IOS && ostype != rpc.IOSXR {
 		return nil, errors.New("'show process memory' is not implemented for " + ostype)
 	}	
 	items := []MemoryFact{}
@@ -76,7 +76,7 @@ func (c *factsCollector) ParseMemory(ostype string, output string) ([]MemoryFact
 
 // ParseCPU parses cli output and tries to find current CPU utilization
 func (c *factsCollector) ParseCPU(ostype string, output string) (CPUFact, error) {
-	if ostype != rpc.IOSXE && ostype != rpc.IOS && != rpc.IOSXR {
+	if ostype != rpc.IOSXE && ostype != rpc.IOS && ostype != rpc.IOSXR {
 		return CPUFact{}, errors.New("'show process cpu' is not implemented for " + ostype)
 	}
 	if ostype == rpc.IOSXR {
