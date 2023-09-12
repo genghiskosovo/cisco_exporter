@@ -47,9 +47,9 @@ func (c *factsCollector) ParseMemory(ostype string, output string) ([]MemoryFact
 			}
 			item := MemoryFact{
 				Type:  "Physical Memory",
-				Total: util.Str2float64(matches[1]),
-				Free:  util.Str2float64(matches[2]),
-				Used:  (util.Str2float64(matches[1]) - util.Str2float64(matches[2])),
+				Total: (util.Str2float64(matches[1]))*1000000, // *1000000 to get memory in bytes
+				Free:  (util.Str2float64(matches[2]))*1000000,
+				Used:  (util.Str2float64(matches[1]) - util.Str2float64(matches[2]))*1000000,
 
 			}
 			items = append(items, item)
