@@ -17,8 +17,8 @@ var (
 	memoryUsedDesc     *prometheus.Desc
 	memoryFreeDesc     *prometheus.Desc
 	cpuOneMinuteDesc   *prometheus.Desc
-	cpuFiveSecondsDesc *prometheus.Desc
-	cpuInterruptsDesc  *prometheus.Desc
+//	cpuFiveSecondsDesc *prometheus.Desc
+//	cpuInterruptsDesc  *prometheus.Desc
 	cpuFiveMinutesDesc *prometheus.Desc
 	memorycmd string
 )
@@ -32,8 +32,8 @@ func init() {
 	memoryFreeDesc = prometheus.NewDesc(prefix+"memory_free", "Free memory", append(l, "type"), nil)
 
 	cpuOneMinuteDesc = prometheus.NewDesc(prefix+"cpu_one_minute_percent", "CPU utilization for one minute", l, nil)
-	cpuFiveSecondsDesc = prometheus.NewDesc(prefix+"cpu_five_seconds_percent", "CPU utilization for five seconds", l, nil)
-	cpuInterruptsDesc = prometheus.NewDesc(prefix+"cpu_interrupt_percent", "Interrupt percentage", l, nil)
+//	cpuFiveSecondsDesc = prometheus.NewDesc(prefix+"cpu_five_seconds_percent", "CPU utilization for five seconds", l, nil)
+//	cpuInterruptsDesc = prometheus.NewDesc(prefix+"cpu_interrupt_percent", "Interrupt percentage", l, nil)
 	cpuFiveMinutesDesc = prometheus.NewDesc(prefix+"cpu_five_minutes_percent", "CPU utilization for five minutes", l, nil)
 }
 
@@ -109,8 +109,8 @@ func (c *factsCollector) CollectCPU(client *rpc.Client, ch chan<- prometheus.Met
 		return err
 	}
 	ch <- prometheus.MustNewConstMetric(cpuOneMinuteDesc, prometheus.GaugeValue, item.OneMinute, labelValues...)
-	ch <- prometheus.MustNewConstMetric(cpuFiveSecondsDesc, prometheus.GaugeValue, item.FiveSeconds, labelValues...)
-	ch <- prometheus.MustNewConstMetric(cpuInterruptsDesc, prometheus.GaugeValue, item.Interrupts, labelValues...)
+//	ch <- prometheus.MustNewConstMetric(cpuFiveSecondsDesc, prometheus.GaugeValue, item.FiveSeconds, labelValues...)
+//	ch <- prometheus.MustNewConstMetric(cpuInterruptsDesc, prometheus.GaugeValue, item.Interrupts, labelValues...)
 	ch <- prometheus.MustNewConstMetric(cpuFiveMinutesDesc, prometheus.GaugeValue, item.FiveMinutes, labelValues...)
 	return nil
 }

@@ -104,8 +104,8 @@ func (c *factsCollector) ParseCPU(ostype string, output string) (CPUFact, error)
 	    		continue
 	    	}
 	    	return CPUFact{
-	    		FiveSeconds: util.Str2float64(matches[1]),
-	    		Interrupts:  util.Str2float64(matches[2]),
+//	    		FiveSeconds: util.Str2float64(matches[1]),
+//	    		Interrupts:  util.Str2float64(matches[2]),
 	    		OneMinute:   util.Str2float64(matches[3]),
 	    		FiveMinutes: util.Str2float64(matches[4]),
 	    	}, nil

@@ -12,8 +12,8 @@ type MemoryFact struct {
 }
 
 type CPUFact struct {
-	FiveSeconds float64
-	Interrupts  float64
+//	FiveSeconds float64
+//	Interrupts  float64
 	OneMinute   float64
 	FiveMinutes float64
 }
