@@ -82,34 +82,4 @@ func (c *bgpCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, 
 	}  else {
 		return nil
 	}
-	// 	bgpcmd = "show bgp all summary"
-	// 	items, err := c.Parse(client.OSType, out)
-	// 	out, err := client.RunCommand(bgpcmd)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	
-	// 	if err != nil {
-	// 		if client.Debug {
-	// 			log.Printf("Parse bgp sessions for %s: %s\n", labelValues[0], err.Error())
-	// 		}
-	// 		return nil
-	// 	}
-	
-	// 	for _, item := range items {
-	// 		l := append(labelValues, item.Asn, item.Ip)
-	
-	// 		up := 0
-	// 		if item.Up {
-	// 			up = 1
-	// 		}
-	
-	// 		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, float64(up), l...)
-	// 		ch <- prometheus.MustNewConstMetric(receivedPrefixesDesc, prometheus.GaugeValue, float64(item.ReceivedPrefixes), l...)
-	// 		ch <- prometheus.MustNewConstMetric(inputMessagesDesc, prometheus.GaugeValue, float64(item.InputMessages), l...)
-	// 		ch <- prometheus.MustNewConstMetric(outputMessagesDesc, prometheus.GaugeValue, float64(item.OutputMessages), l...)
-	// 	}
-	
-	// 	return nil
-	// }
 }
