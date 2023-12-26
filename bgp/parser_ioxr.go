@@ -21,7 +21,7 @@ func (c *bgpCollector) Parse2(ostype string, output string) ([]BgpSession2, erro
 	pattern := `(?ms)BGP neighbor is (?P<neighbor_ip>\S+).*?` +
 	`Remote AS (?P<remote_as>\d+).*?` +
 	`Description: (?P<description>.*?)\n.*?` +
-	`BGP state = (?P<bgp_state>\S+),.*?` +
+	`BGP state = (?P<bgp_state>\w+).*?` +
 	`(?P<accepted_prefixes>\d+) accepted prefixes, (?P<best_paths>\d+) are bestpaths.*?` +
 	`Prefix advertised (?P<prefix_advertised>\d+),`
 
