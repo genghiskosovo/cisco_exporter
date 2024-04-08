@@ -4,7 +4,6 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-
 	"github.com/lwlcom/cisco_exporter/rpc"
 	"github.com/lwlcom/cisco_exporter/util"
 )
@@ -23,7 +22,7 @@ func (c *bgpCollector) Parse2(ostype string, output string) ([]BgpSession2, erro
 	`Description: (?P<description>.*?)\n.*?` +
 	`BGP state = (?P<bgp_state>\w+).*?` +
 	`(?P<accepted_prefixes>\d+) accepted prefixes, (?P<best_paths>\d+) are bestpaths.*?` +
-	`Prefix advertised (?P<prefix_advertised>\d+),`
+	`Prefix advertised (?P<prefix_advertised>\d+), suppressed \d+, withdrawn (?P<prefix_withdrawn>\d+)`
 
 	// Compile the regex
 	r, _ := regexp.Compile(pattern)
@@ -44,16 +43,20 @@ func (c *bgpCollector) Parse2(ostype string, output string) ([]BgpSession2, erro
 		if strings.TrimSpace(result["bgp_state"]) != "Established" {
 			up = false
 		}
+		advertised_exact := util.Str2float64(strings.TrimSpace(result["prefix_advertised"])) - util.Str2float64(strings.TrimSpace(result["prefix_withdrawn"]))
 		item := BgpSession2{
 			Ip:               strings.TrimSpace(result["neighbor_ip"]),
 			Asn:              strings.TrimSpace(result["remote_as"]),
 			AcceptedPrefixes: util.Str2float64(strings.TrimSpace(result["accepted_prefixes"])),
 			BestPath:         util.Str2float64(strings.TrimSpace(result["best_paths"])),
 			Up:               up,
-			PrefixAdvertised: util.Str2float64(strings.TrimSpace(result["prefix_advertised"])),
+			PrefixAdvertised: advertised_exact,
 			Description:      strings.TrimSpace(result["description"]),
 		}
 		items = append(items, item)
 	}
+	// for _, item := range items {
+	// 	fmt.Printf("IP: %s, ASN: %s, Accepted Prefixes: %f, Best Path: %f, Up: %t, Prefix Advertised: %f, Description: %s\n", item.Ip, item.Asn, item.AcceptedPrefixes, item.BestPath, item.Up, item.PrefixAdvertised, item.Description)
+	// }
 	return items, nil
 }
