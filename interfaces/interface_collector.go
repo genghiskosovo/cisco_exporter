@@ -1,12 +1,10 @@
 package interfaces
 
 import (
-	"log"
-
-	"github.com/lwlcom/cisco_exporter/rpc"
-
 	"github.com/lwlcom/cisco_exporter/collector"
+	"github.com/lwlcom/cisco_exporter/rpc"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 const prefix string = "cisco_interface_"

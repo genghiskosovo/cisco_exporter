@@ -8,13 +8,14 @@ import (
 	"github.com/lwlcom/cisco_exporter/util"
 )
 
+var neighborRegexp = regexp.MustCompile(`(\S+)\s+\d\s+(\d+)\s+(\d+)\s+(\d+)\s+\d+\s+\d+\s+\d+\s+\S+\s+(\S+)\s*`)
+
 // Parse parses cli output and tries to find bgp sessions with related data
 func (c *bgpCollector) Parse(ostype string, output string) ([]BgpSession, error) {
-	if ostype != rpc.IOSXE && ostype != rpc.NXOS && ostype != rpc.IOSXR {
+	if ostype != rpc.IOSXE && ostype != rpc.NXOS {
 		return nil, errors.New("'show bgp all summary' is not implemented for " + ostype)
 	}
 	items := []BgpSession{}
-	neighborRegexp, _ := regexp.Compile(`(\S+)\s+\d\s+(\d+)\s+(\d+)\s+(\d+)\s+\d+\s+\d+\s+\d+\s+\S+\s+(\S+)\s*`)
 
 	matches := neighborRegexp.FindAllStringSubmatch(output, -1)
 	for _, match := range matches {

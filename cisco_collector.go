@@ -70,7 +70,7 @@ func (c *ciscoCollector) collectForHost(device *connector.Device, ch chan<- prom
 		ch <- prometheus.MustNewConstMetric(scrapeDurationDesc, prometheus.GaugeValue, time.Since(t).Seconds(), l...)
 	}()
 
-	conn, err := connector.NewSSSHConnection(device, cfg)
+	conn, err := connector.NewSSHConnection(device, cfg)
 	if err != nil {
 		log.Errorln(err)
 		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 0, l...)

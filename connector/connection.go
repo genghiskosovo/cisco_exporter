@@ -14,8 +14,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// NewSSSHConnection connects to device
-func NewSSSHConnection(device *Device, cfg *config.Config) (*SSHConnection, error) {
+// NewSSHConnection connects to device
+func NewSSHConnection(device *Device, cfg *config.Config) (*SSHConnection, error) {
 	deviceConfig := device.DeviceConfig
 
 	legacyCiphers := cfg.LegacyCiphers
@@ -40,9 +40,8 @@ func NewSSSHConnection(device *Device, cfg *config.Config) (*SSHConnection, erro
 	if legacyCiphers {
 		sshConfig.SetDefaults()
 		sshConfig.Ciphers = append(sshConfig.Ciphers, "aes128-cbc", "3des-cbc")
-		sshConfig.Ciphers = append(sshConfig.Ciphers, "aes128-cbc", "3des-cbc")
-                sshConfig.KeyExchanges = append(sshConfig.KeyExchanges, "diffie-hellman-group1-sha1")
-                sshConfig.MACs = append(sshConfig.MACs, "hmac-sha1")
+		sshConfig.KeyExchanges = append(sshConfig.KeyExchanges, "diffie-hellman-group1-sha1")
+		sshConfig.MACs = append(sshConfig.MACs, "hmac-sha1")
 	}
 
 	device.Auth(sshConfig)
@@ -85,8 +84,16 @@ func (c *SSHConnection) Connect() error {
 		c.client.Conn.Close()
 		return err
 	}
-	c.stdin, _ = session.StdinPipe()
-	c.stdout, _ = session.StdoutPipe()
+	c.stdin, err = session.StdinPipe()
+	if err != nil {
+		c.client.Conn.Close()
+		return errors.Wrap(err, "could not open stdin pipe")
+	}
+	c.stdout, err = session.StdoutPipe()
+	if err != nil {
+		c.client.Conn.Close()
+		return errors.Wrap(err, "could not open stdout pipe")
+	}
 	modes := ssh.TerminalModes{
 		ssh.ECHO:  0,
 		ssh.OCRNL: 0,
@@ -111,7 +118,7 @@ func (c *SSHConnection) RunCommand(cmd string) (string, error) {
 	buf := bufio.NewReader(c.stdout)
 	io.WriteString(c.stdin, cmd+"\n")
 
-	outputChan := make(chan result)
+	outputChan := make(chan result, 1)
 	go func() {
 		c.readln(outputChan, cmd, buf)
 	}()
@@ -125,7 +132,7 @@ func (c *SSHConnection) RunCommand(cmd string) (string, error) {
 
 // Close closes connection
 func (c *SSHConnection) Close() {
-	if c.client.Conn == nil {
+	if c.client == nil || c.client.Conn == nil {
 		return
 	}
 	c.client.Conn.Close()
@@ -156,6 +163,7 @@ func (c *SSHConnection) readln(ch chan result, cmd string, r io.Reader) {
 		n, err := r.Read(buf)
 		if err != nil {
 			ch <- result{output: "", err: err}
+			return
 		}
 		loadStr += string(buf[:n])
 		if strings.Contains(loadStr, cmd) && re.MatchString(loadStr) {
