@@ -1,18 +1,13 @@
 package connector
 
 import (
-	"bufio"
 	"io"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/lwlcom/cisco_exporter/config"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 )
-
-var promptRegexp = regexp.MustCompile(`.+#\s?$`)
 
 // NewSSSHConnection connects to device
 func NewSSSHConnection(device *Device, cfg *config.Config) (*SSHConnection, error) {
@@ -21,11 +16,6 @@ func NewSSSHConnection(device *Device, cfg *config.Config) (*SSHConnection, erro
 	legacyCiphers := cfg.LegacyCiphers
 	if deviceConfig.LegacyCiphers != nil {
 		legacyCiphers = *deviceConfig.LegacyCiphers
-	}
-
-	batchSize := cfg.BatchSize
-	if deviceConfig.BatchSize != nil {
-		batchSize = *deviceConfig.BatchSize
 	}
 
 	timeout := cfg.Timeout
@@ -48,12 +38,11 @@ func NewSSSHConnection(device *Device, cfg *config.Config) (*SSHConnection, erro
 
 	c := &SSHConnection{
 		Host:         device.Host + ":" + device.Port,
-		batchSize:    batchSize,
+		timeout:      time.Duration(timeout) * time.Second,
 		clientConfig: sshConfig,
 	}
 
-	err := c.Connect()
-	if err != nil {
+	if err := c.Connect(); err != nil {
 		return nil, err
 	}
 
@@ -64,11 +53,7 @@ func NewSSSHConnection(device *Device, cfg *config.Config) (*SSHConnection, erro
 type SSHConnection struct {
 	client       *ssh.Client
 	Host         string
-	stdin        io.WriteCloser
-	stdout       io.Reader
-	buf          *bufio.Reader
-	session      *ssh.Session
-	batchSize    int
+	timeout      time.Duration
 	clientConfig *ssh.ClientConfig
 }
 
@@ -76,84 +61,42 @@ type SSHConnection struct {
 func (c *SSHConnection) Connect() error {
 	var err error
 	c.client, err = ssh.Dial("tcp", c.Host, c.clientConfig)
-	if err != nil {
-		return err
-	}
+	return err
+}
 
+// RunCommand runs a command against the device using a dedicated exec session.
+// Each call opens a new SSH channel on the existing connection, sends the
+// command, and returns the full output once the command exits. No PTY or
+// interactive shell is needed; Cisco devices do not paginate output in exec mode.
+func (c *SSHConnection) RunCommand(cmd string) (string, error) {
 	session, err := c.client.NewSession()
 	if err != nil {
-		c.client.Conn.Close()
-		return err
-	}
-
-	c.stdin, err = session.StdinPipe()
-	if err != nil {
-		session.Close()
-		c.client.Conn.Close()
-		return err
-	}
-
-	c.stdout, err = session.StdoutPipe()
-	if err != nil {
-		session.Close()
-		c.client.Conn.Close()
-		return err
-	}
-
-	c.buf = bufio.NewReader(c.stdout)
-
-	modes := ssh.TerminalModes{
-		ssh.ECHO:  0,
-		ssh.OCRNL: 0,
-	}
-	// RequestPty failure is non-fatal: some devices (e.g. IOS XR) reject PTY
-	// requests but still allow shell access. Pagination is disabled via
-	// 'terminal length 0' so PTY dimensions do not matter.
-	session.RequestPty("vt100", 24, 2000, modes)
-
-	if err = session.Shell(); err != nil {
-		session.Close()
-		c.client.Conn.Close()
-		return err
-	}
-	c.session = session
-
-	c.RunCommand("")
-	c.RunCommand("terminal length 0")
-
-	return nil
-}
-
-type result struct {
-	output string
-	err    error
-}
-
-// RunCommand runs a command against the device
-func (c *SSHConnection) RunCommand(cmd string) (string, error) {
-	if _, err := io.WriteString(c.stdin, cmd+"\n"); err != nil {
 		return "", err
 	}
+	defer session.Close()
 
-	outputChan := make(chan result, 1)
+	type result struct {
+		out []byte
+		err error
+	}
+	ch := make(chan result, 1)
 	go func() {
-		c.readln(outputChan, cmd, c.buf)
+		out, err := session.Output(cmd)
+		ch <- result{out, err}
 	}()
+
 	select {
-	case res := <-outputChan:
-		return res.output, res.err
-	case <-time.After(c.clientConfig.Timeout):
-		return "", errors.New("Timeout reached")
+	case res := <-ch:
+		return string(res.out), res.err
+	case <-time.After(c.timeout):
+		return "", errors.New("timeout reached")
 	}
 }
 
-// Close closes connection
+// Close closes the connection
 func (c *SSHConnection) Close() {
-	if c.session != nil {
-		c.session.Close()
-	}
-	if c.client != nil && c.client.Conn != nil {
-		c.client.Conn.Close()
+	if c.client != nil {
+		c.client.Close()
 	}
 }
 
@@ -169,22 +112,4 @@ func loadPrivateKey(r io.Reader) (ssh.AuthMethod, error) {
 	}
 
 	return ssh.PublicKeys(key), nil
-}
-
-func (c *SSHConnection) readln(ch chan result, cmd string, r io.Reader) {
-	buf := make([]byte, c.batchSize)
-	loadStr := ""
-	for {
-		n, err := r.Read(buf)
-		if err != nil {
-			ch <- result{output: "", err: err}
-			return
-		}
-		loadStr += string(buf[:n])
-		if strings.Contains(loadStr, cmd) && promptRegexp.MatchString(loadStr) {
-			break
-		}
-	}
-	loadStr = strings.Replace(loadStr, "\r", "", -1)
-	ch <- result{output: loadStr, err: nil}
 }
