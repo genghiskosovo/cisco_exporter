@@ -70,6 +70,7 @@ type SSHConnection struct {
 	session      *ssh.Session
 	batchSize    int
 	clientConfig *ssh.ClientConfig
+	noEcho       bool // true when device rejected PTY — commands are not echoed back
 }
 
 // Connect connects to the device
@@ -109,10 +110,13 @@ func (c *SSHConnection) Connect() error {
 		ssh.ECHO:  0,
 		ssh.OCRNL: 0,
 	}
-	// RequestPty failure is non-fatal: IOS XR rejects PTY requests but
-	// still allows shell access. Pagination is disabled via 'terminal length 0'.
+	// RequestPty failure is non-fatal: IOS XR rejects PTY requests but still
+	// allows shell access. Track whether PTY was accepted because devices with
+	// a PTY echo commands back (used to detect end of command output), while
+	// devices without a PTY do not.
 	if err = session.RequestPty("vt100", 24, 2000, modes); err != nil {
 		log.Debugf("[%s] PTY request rejected (non-fatal): %v", c.Host, err)
+		c.noEcho = true
 	}
 
 	if err = session.Shell(); err != nil {
@@ -148,7 +152,7 @@ func (c *SSHConnection) RunCommand(cmd string) (string, error) {
 
 	outputChan := make(chan result, 1)
 	go func() {
-		c.readln(outputChan, c.buf)
+		c.readln(outputChan, cmd, c.buf)
 	}()
 	select {
 	case res := <-outputChan:
@@ -190,10 +194,11 @@ func loadPrivateKey(r io.Reader) (ssh.AuthMethod, error) {
 	return ssh.PublicKeys(key), nil
 }
 
-// readln reads from r until the shell prompt (pattern: .+#) is detected.
-// We do not check for command echo in the output because some platforms
-// (e.g. IOS XR without PTY) do not echo commands back to the client.
-func (c *SSHConnection) readln(ch chan result, r io.Reader) {
+// readln reads from r until the shell prompt is detected.
+// Devices with a PTY echo commands back, so we require both the command text
+// and the prompt to appear in the output before returning. Devices without a
+// PTY (e.g. IOS XR, c.noEcho=true) do not echo, so we wait for the prompt alone.
+func (c *SSHConnection) readln(ch chan result, cmd string, r io.Reader) {
 	buf := make([]byte, c.batchSize)
 	loadStr := ""
 	for {
@@ -207,8 +212,10 @@ func (c *SSHConnection) readln(ch chan result, r io.Reader) {
 		log.Debugf("[%s] readln received %d bytes: %q", c.Host, n, chunk)
 		loadStr += chunk
 		if promptRegexp.MatchString(loadStr) {
-			log.Debugf("[%s] prompt detected", c.Host)
-			break
+			if cmd == "" || c.noEcho || strings.Contains(loadStr, cmd) {
+				log.Debugf("[%s] prompt detected", c.Host)
+				break
+			}
 		}
 	}
 	loadStr = strings.Replace(loadStr, "\r", "", -1)
