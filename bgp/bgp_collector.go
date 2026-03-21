@@ -1,9 +1,8 @@
 package bgp
 
 import (
-	"github.com/lwlcom/cisco_exporter/rpc"
-
 	"github.com/lwlcom/cisco_exporter/collector"
+	"github.com/lwlcom/cisco_exporter/rpc"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
@@ -11,22 +10,21 @@ import (
 const prefix string = "cisco_bgp_session_"
 
 var (
-	upDesc               *prometheus.Desc
-	receivedPrefixesDesc *prometheus.Desc
-	inputMessagesDesc    *prometheus.Desc
-	outputMessagesDesc   *prometheus.Desc
+	upDesc                 *prometheus.Desc
+	receivedPrefixesDesc   *prometheus.Desc
+	advertisedPrefixesDesc *prometheus.Desc
+	bestPathsDesc          *prometheus.Desc
 )
 
 func init() {
-	l := []string{"target", "asn", "ip"}
+	l := []string{"target", "asn", "ip", "description"}
 	upDesc = prometheus.NewDesc(prefix+"up", "Session is up (1 = Established)", l, nil)
 	receivedPrefixesDesc = prometheus.NewDesc(prefix+"prefixes_received_count", "Number of received prefixes", l, nil)
-	inputMessagesDesc = prometheus.NewDesc(prefix+"messages_input_count", "Number of received messages", l, nil)
-	outputMessagesDesc = prometheus.NewDesc(prefix+"messages_output_count", "Number of transmitted messages", l, nil)
+	advertisedPrefixesDesc = prometheus.NewDesc(prefix+"prefixes_advertised_count", "Number of advertised prefixes", l, nil)
+	bestPathsDesc = prometheus.NewDesc(prefix+"best_path_count", "Number of best paths from peer", l, nil)
 }
 
-type bgpCollector struct {
-}
+type bgpCollector struct{}
 
 // NewCollector creates a new collector
 func NewCollector() collector.RPCCollector {
@@ -42,43 +40,62 @@ func (*bgpCollector) Name() string {
 func (*bgpCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- upDesc
 	ch <- receivedPrefixesDesc
-	ch <- inputMessagesDesc
-	ch <- outputMessagesDesc
+	ch <- advertisedPrefixesDesc
+	ch <- bestPathsDesc
 }
 
 // Collect collects metrics from Cisco
 func (c *bgpCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
-	var bgpcmd string
 	if client.OSType == rpc.IOSXR {
-		bgpcmd = "show bgp all unicast summary"
-	} else {
-		bgpcmd = "show bgp all summary"
+		return c.collectIOSXR(client, ch, labelValues)
 	}
+	return c.collectStandard(client, ch, labelValues)
+}
 
-	out, err := client.RunCommand(bgpcmd)
+// collectIOSXR uses 'show bgp neighbor' which provides richer per-peer data
+func (c *bgpCollector) collectIOSXR(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
+	out, err := client.RunCommand("show bgp neighbor")
 	if err != nil {
 		return err
 	}
+	items, err := c.Parse2(client.OSType, out)
+	if err != nil {
+		log.Debugf("Parse bgp sessions for %s: %s", labelValues[0], err.Error())
+		return nil
+	}
+	for _, item := range items {
+		l := append(labelValues, item.Asn, item.Ip, item.Description)
+		up := 0
+		if item.Up {
+			up = 1
+		}
+		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, float64(up), l...)
+		ch <- prometheus.MustNewConstMetric(receivedPrefixesDesc, prometheus.GaugeValue, item.AcceptedPrefixes, l...)
+		ch <- prometheus.MustNewConstMetric(advertisedPrefixesDesc, prometheus.GaugeValue, item.PrefixAdvertised, l...)
+		ch <- prometheus.MustNewConstMetric(bestPathsDesc, prometheus.GaugeValue, item.BestPath, l...)
+	}
+	return nil
+}
 
+// collectStandard uses 'show bgp all summary' for IOS XE and NX-OS
+func (c *bgpCollector) collectStandard(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
+	out, err := client.RunCommand("show bgp all summary")
+	if err != nil {
+		return err
+	}
 	items, err := c.Parse(client.OSType, out)
 	if err != nil {
 		log.Debugf("Parse bgp sessions for %s: %s", labelValues[0], err.Error())
 		return nil
 	}
-
 	for _, item := range items {
-		l := append(labelValues, item.Asn, item.IP)
-
+		l := append(labelValues, item.Asn, item.IP, "")
 		up := 0
 		if item.Up {
 			up = 1
 		}
-
 		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, float64(up), l...)
-		ch <- prometheus.MustNewConstMetric(receivedPrefixesDesc, prometheus.GaugeValue, float64(item.ReceivedPrefixes), l...)
-		ch <- prometheus.MustNewConstMetric(inputMessagesDesc, prometheus.GaugeValue, float64(item.InputMessages), l...)
-		ch <- prometheus.MustNewConstMetric(outputMessagesDesc, prometheus.GaugeValue, float64(item.OutputMessages), l...)
+		ch <- prometheus.MustNewConstMetric(receivedPrefixesDesc, prometheus.GaugeValue, item.ReceivedPrefixes, l...)
 	}
-
 	return nil
 }

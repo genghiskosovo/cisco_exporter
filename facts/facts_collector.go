@@ -1,9 +1,8 @@
 package facts
 
 import (
-	"github.com/lwlcom/cisco_exporter/rpc"
-
 	"github.com/lwlcom/cisco_exporter/collector"
+	"github.com/lwlcom/cisco_exporter/rpc"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
@@ -35,8 +34,7 @@ func init() {
 	cpuFiveMinutesDesc = prometheus.NewDesc(prefix+"cpu_five_minutes_percent", "CPU utilization for five minutes", l, nil)
 }
 
-type factsCollector struct {
-}
+type factsCollector struct{}
 
 // NewCollector creates a new collector
 func NewCollector() collector.RPCCollector {
@@ -56,7 +54,7 @@ func (*factsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- memoryFreeDesc
 }
 
-// CollectVersion collects version informations from Cisco
+// CollectVersion collects version information from Cisco
 func (c *factsCollector) CollectVersion(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
 	out, err := client.RunCommand("show version")
 	if err != nil {
@@ -71,9 +69,13 @@ func (c *factsCollector) CollectVersion(client *rpc.Client, ch chan<- prometheus
 	return nil
 }
 
-// CollectMemory collects memory informations from Cisco
+// CollectMemory collects memory information from Cisco
 func (c *factsCollector) CollectMemory(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
-	out, err := client.RunCommand("show process memory")
+	memorycmd := "show process memory"
+	if client.OSType == rpc.IOSXR {
+		memorycmd = "show memory summary"
+	}
+	out, err := client.RunCommand(memorycmd)
 	if err != nil {
 		return err
 	}
@@ -90,7 +92,7 @@ func (c *factsCollector) CollectMemory(client *rpc.Client, ch chan<- prometheus.
 	return nil
 }
 
-// CollectCPU collects cpu informations from Cisco
+// CollectCPU collects CPU information from Cisco
 func (c *factsCollector) CollectCPU(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
 	out, err := client.RunCommand("show process cpu")
 	if err != nil {
@@ -101,9 +103,12 @@ func (c *factsCollector) CollectCPU(client *rpc.Client, ch chan<- prometheus.Met
 		return err
 	}
 	ch <- prometheus.MustNewConstMetric(cpuOneMinuteDesc, prometheus.GaugeValue, item.OneMinute, labelValues...)
-	ch <- prometheus.MustNewConstMetric(cpuFiveSecondsDesc, prometheus.GaugeValue, item.FiveSeconds, labelValues...)
-	ch <- prometheus.MustNewConstMetric(cpuInterruptsDesc, prometheus.GaugeValue, item.Interrupts, labelValues...)
 	ch <- prometheus.MustNewConstMetric(cpuFiveMinutesDesc, prometheus.GaugeValue, item.FiveMinutes, labelValues...)
+	// FiveSeconds and Interrupts are only available on IOS / IOS XE
+	if client.OSType != rpc.IOSXR {
+		ch <- prometheus.MustNewConstMetric(cpuFiveSecondsDesc, prometheus.GaugeValue, item.FiveSeconds, labelValues...)
+		ch <- prometheus.MustNewConstMetric(cpuInterruptsDesc, prometheus.GaugeValue, item.Interrupts, labelValues...)
+	}
 	return nil
 }
 
