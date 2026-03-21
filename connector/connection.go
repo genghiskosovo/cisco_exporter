@@ -106,11 +106,11 @@ func (c *SSHConnection) Connect() error {
 		ssh.ECHO:  0,
 		ssh.OCRNL: 0,
 	}
-	if err = session.RequestPty("vt100", 24, 2000, modes); err != nil {
-		session.Close()
-		c.client.Conn.Close()
-		return err
-	}
+	// RequestPty failure is non-fatal: some devices (e.g. IOS XR) reject PTY
+	// requests but still allow shell access. Pagination is disabled via
+	// 'terminal length 0' so PTY dimensions do not matter.
+	session.RequestPty("vt100", 24, 2000, modes)
+
 	if err = session.Shell(); err != nil {
 		session.Close()
 		c.client.Conn.Close()
