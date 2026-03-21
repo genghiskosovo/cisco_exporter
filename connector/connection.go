@@ -106,7 +106,7 @@ func (c *SSHConnection) Connect() error {
 		ssh.ECHO:  0,
 		ssh.OCRNL: 0,
 	}
-	if err = session.RequestPty("vt100", 0, 2000, modes); err != nil {
+	if err = session.RequestPty("vt100", 24, 2000, modes); err != nil {
 		session.Close()
 		c.client.Conn.Close()
 		return err
