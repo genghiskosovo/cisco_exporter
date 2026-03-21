@@ -1,12 +1,11 @@
 package facts
 
 import (
-	"log"
-
 	"github.com/lwlcom/cisco_exporter/rpc"
 
 	"github.com/lwlcom/cisco_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 const prefix string = "cisco_facts_"
@@ -110,17 +109,14 @@ func (c *factsCollector) CollectCPU(client *rpc.Client, ch chan<- prometheus.Met
 
 // Collect collects metrics from Cisco
 func (c *factsCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
-	err := c.CollectVersion(client, ch, labelValues)
-	if client.Debug && err != nil {
-		log.Printf("CollectVersion for %s: %s\n", labelValues[0], err.Error())
+	if err := c.CollectVersion(client, ch, labelValues); err != nil {
+		log.Debugf("CollectVersion for %s: %s", labelValues[0], err.Error())
 	}
-	err = c.CollectMemory(client, ch, labelValues)
-	if client.Debug && err != nil {
-		log.Printf("CollectMemory for %s: %s\n", labelValues[0], err.Error())
+	if err := c.CollectMemory(client, ch, labelValues); err != nil {
+		log.Debugf("CollectMemory for %s: %s", labelValues[0], err.Error())
 	}
-	err = c.CollectCPU(client, ch, labelValues)
-	if client.Debug && err != nil {
-		log.Printf("CollectCPU for %s: %s\n", labelValues[0], err.Error())
+	if err := c.CollectCPU(client, ch, labelValues); err != nil {
+		log.Debugf("CollectCPU for %s: %s", labelValues[0], err.Error())
 	}
 	return nil
 }

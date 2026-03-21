@@ -2,7 +2,6 @@ package config
 
 import (
 	"io"
-	"io/ioutil"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -15,7 +14,7 @@ type Config struct {
 	Timeout       int             `yaml:"timeout,omitempty"`
 	BatchSize     int             `yaml:"batch_size,omitempty"`
 	Username      string          `yaml:"username,omitempty"`
-	Password      string          `yaml:"Password,omitempty"`
+	Password      string          `yaml:"password,omitempty"`
 	KeyFile       string          `yaml:"key_file,omitempty"`
 	Devices       []*DeviceConfig `yaml:"devices,omitempty"`
 	Features      *FeatureConfig  `yaml:"features,omitempty"`
@@ -54,7 +53,7 @@ func New() *Config {
 
 // Load loads a config from reader
 func Load(reader io.Reader) (*Config, error) {
-	b, err := ioutil.ReadAll(reader)
+	b, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +109,9 @@ func (c *Config) setDefaultValues() {
 
 // DevicesFromTargets creates devices configs from targets list
 func (c *Config) DevicesFromTargets(sshHosts string) {
+	if sshHosts == "" {
+		return
+	}
 	targets := strings.Split(sshHosts, ",")
 
 	c.Devices = make([]*DeviceConfig, len(targets))

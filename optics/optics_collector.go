@@ -1,13 +1,13 @@
 package optics
 
 import (
-	"log"
 	"regexp"
 
 	"github.com/lwlcom/cisco_exporter/rpc"
 
 	"github.com/lwlcom/cisco_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 const prefix string = "cisco_optics_"
@@ -59,13 +59,11 @@ func (c *opticsCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metri
 	}
 	interfaces, err := c.ParseInterfaces(client.OSType, out)
 	if err != nil {
-		if client.Debug {
-			log.Printf("ParseInterfaces for %s: %s\n", labelValues[0], err.Error())
-		}
+		log.Debugf("ParseInterfaces for %s: %s", labelValues[0], err.Error())
 		return nil
 	}
 
-	xeDev, _ := regexp.Compile(`\S(\d+)/(\d+)/(\d+)`)
+	xeDev := regexp.MustCompile(`\S(\d+)/(\d+)/(\d+)`)
 
 	for _, i := range interfaces {
 		switch client.OSType {
@@ -81,16 +79,12 @@ func (c *opticsCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metri
 			out, err = client.RunCommand("show hw-module subslot " + matches[1] + "/" + matches[2] + " transceiver " + matches[3] + " status")
 		}
 		if err != nil {
-			if client.Debug {
-				log.Printf("Transceiver command on %s: %s\n", labelValues[0], err.Error())
-			}
+			log.Debugf("Transceiver command on %s: %s", labelValues[0], err.Error())
 			continue
 		}
 		optic, err := c.ParseTransceiver(client.OSType, out)
 		if err != nil {
-			if client.Debug {
-				log.Printf("Transceiver data for %s: %s\n", labelValues[0], err.Error())
-			}
+			log.Debugf("Transceiver data for %s: %s", labelValues[0], err.Error())
 			continue
 		}
 		l := append(labelValues, i)

@@ -1,12 +1,11 @@
 package bgp
 
 import (
-	"log"
-
 	"github.com/lwlcom/cisco_exporter/rpc"
 
 	"github.com/lwlcom/cisco_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 const prefix string = "cisco_bgp_session_"
@@ -16,7 +15,6 @@ var (
 	receivedPrefixesDesc *prometheus.Desc
 	inputMessagesDesc    *prometheus.Desc
 	outputMessagesDesc   *prometheus.Desc
-	bgpcmd string
 )
 
 func init() {
@@ -50,12 +48,13 @@ func (*bgpCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect collects metrics from Cisco
 func (c *bgpCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
-	if client.OSType == "IOSXR" {
+	var bgpcmd string
+	if client.OSType == rpc.IOSXR {
 		bgpcmd = "show bgp all unicast summary"
 	} else {
 		bgpcmd = "show bgp all summary"
 	}
-	
+
 	out, err := client.RunCommand(bgpcmd)
 	if err != nil {
 		return err
@@ -63,9 +62,7 @@ func (c *bgpCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, 
 
 	items, err := c.Parse(client.OSType, out)
 	if err != nil {
-		if client.Debug {
-			log.Printf("Parse bgp sessions for %s: %s\n", labelValues[0], err.Error())
-		}
+		log.Debugf("Parse bgp sessions for %s: %s", labelValues[0], err.Error())
 		return nil
 	}
 

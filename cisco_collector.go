@@ -78,14 +78,14 @@ func (c *ciscoCollector) collectForHost(device *connector.Device, ch chan<- prom
 	}
 	defer conn.Close()
 
-	ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 1, l...)
-
-	client := rpc.NewClient(conn, cfg.Debug)
-	err = client.Identify()
-	if err != nil {
+	client := rpc.NewClient(conn)
+	if err = client.Identify(); err != nil {
 		log.Errorln(device.Host + ": " + err.Error())
+		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 0, l...)
 		return
 	}
+
+	ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 1, l...)
 
 	for _, col := range c.collectors.collectorsForDevice(device) {
 		ct := time.Now()

@@ -1,12 +1,11 @@
 package environment
 
 import (
-	"log"
-
 	"github.com/lwlcom/cisco_exporter/rpc"
 
 	"github.com/lwlcom/cisco_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 const prefix string = "cisco_environment_"
@@ -50,9 +49,7 @@ func (c *environmentCollector) Collect(client *rpc.Client, ch chan<- prometheus.
 	}
 	items, err := c.Parse(client.OSType, out)
 	if err != nil {
-		if client.Debug {
-			log.Printf("Parse environment for %s: %s\n", labelValues[0], err.Error())
-		}
+		log.Debugf("Parse environment for %s: %s", labelValues[0], err.Error())
 		return nil
 	}
 

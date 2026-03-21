@@ -2,12 +2,10 @@ package rpc
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
-	"log"
-
 	"github.com/lwlcom/cisco_exporter/connector"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -15,21 +13,17 @@ const (
 	NXOS  string = "NXOS"
 	IOS   string = "IOS"
 	IOSXR string = "IOSXR"
-
 )
 
 // Client sends commands to a Cisco device
 type Client struct {
 	conn   *connector.SSHConnection
-	Debug  bool
 	OSType string
 }
 
 // NewClient creates a new client connection
-func NewClient(ssh *connector.SSHConnection, debug bool) *Client {
-	rpc := &Client{conn: ssh, Debug: debug}
-
-	return rpc
+func NewClient(ssh *connector.SSHConnection) *Client {
+	return &Client{conn: ssh}
 }
 
 // Identify tries to identify the OS running on a Cisco device
@@ -50,22 +44,17 @@ func (c *Client) Identify() error {
 	default:
 		return errors.New("Unknown OS")
 	}
-	if c.Debug {
-		log.Printf("Host %s identified as: %s\n", c.conn.Host, c.OSType)
-	}
+	log.Debugf("Host %s identified as: %s", c.conn.Host, c.OSType)
 	return nil
 }
 
 // RunCommand runs a command on a Cisco device
 func (c *Client) RunCommand(cmd string) (string, error) {
-	if c.Debug {
-		log.Printf("Running command on %s: %s\n", c.conn.Host, cmd)
-	}
-	output, err := c.conn.RunCommand(fmt.Sprintf("%s", cmd))
+	log.Debugf("Running command on %s: %s", c.conn.Host, cmd)
+	output, err := c.conn.RunCommand(cmd)
 	if err != nil {
-		println(err.Error())
+		log.Debugf("Command error on %s: %s", c.conn.Host, err.Error())
 		return "", err
 	}
-
 	return output, nil
 }

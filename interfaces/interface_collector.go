@@ -1,28 +1,27 @@
 package interfaces
 
 import (
-	"log"
-
 	"github.com/lwlcom/cisco_exporter/rpc"
 
 	"github.com/lwlcom/cisco_exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 const prefix string = "cisco_interface_"
 
 var (
-	receiveBytesDesc       *prometheus.Desc
-	receiveErrorsDesc      *prometheus.Desc
-	receiveDropsDesc       *prometheus.Desc
-	receiveBroadcastDesc   *prometheus.Desc
-	receiveMulticastDesc   *prometheus.Desc
-	transmitBytesDesc      *prometheus.Desc
-	transmitErrorsDesc     *prometheus.Desc
-	transmitDropsDesc      *prometheus.Desc
-	adminStatusDesc        *prometheus.Desc
-	operStatusDesc         *prometheus.Desc
-	errorStatusDesc        *prometheus.Desc
+	receiveBytesDesc     *prometheus.Desc
+	receiveErrorsDesc    *prometheus.Desc
+	receiveDropsDesc     *prometheus.Desc
+	receiveBroadcastDesc *prometheus.Desc
+	receiveMulticastDesc *prometheus.Desc
+	transmitBytesDesc    *prometheus.Desc
+	transmitErrorsDesc   *prometheus.Desc
+	transmitDropsDesc    *prometheus.Desc
+	adminStatusDesc      *prometheus.Desc
+	operStatusDesc       *prometheus.Desc
+	errorStatusDesc      *prometheus.Desc
 )
 
 func init() {
@@ -76,9 +75,7 @@ func (c *interfaceCollector) Collect(client *rpc.Client, ch chan<- prometheus.Me
 	}
 	items, err := c.Parse(client.OSType, out)
 	if err != nil {
-		if client.Debug {
-			log.Printf("Parse interfaces for %s: %s\n", labelValues[0], err.Error())
-		}
+		log.Debugf("Parse interfaces for %s: %s", labelValues[0], err.Error())
 		return nil
 	}
 	if client.OSType == rpc.IOSXE {
@@ -88,9 +85,7 @@ func (c *interfaceCollector) Collect(client *rpc.Client, ch chan<- prometheus.Me
 		}
 		vlans, err := c.ParseVlans(client.OSType, out)
 		if err != nil {
-			if client.Debug {
-				log.Printf("Parse vlans for %s: %s\n", labelValues[0], err.Error())
-			}
+			log.Debugf("Parse vlans for %s: %s", labelValues[0], err.Error())
 			return nil
 		}
 		for _, vlan := range vlans {
