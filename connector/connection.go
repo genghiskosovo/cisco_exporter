@@ -9,6 +9,7 @@ import (
 
 	"github.com/lwlcom/cisco_exporter/config"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -74,10 +75,13 @@ type SSHConnection struct {
 // Connect connects to the device
 func (c *SSHConnection) Connect() error {
 	var err error
+
+	log.Debugf("[%s] dialing SSH", c.Host)
 	c.client, err = ssh.Dial("tcp", c.Host, c.clientConfig)
 	if err != nil {
 		return err
 	}
+	log.Debugf("[%s] SSH connection established", c.Host)
 
 	session, err := c.client.NewSession()
 	if err != nil {
@@ -107,7 +111,9 @@ func (c *SSHConnection) Connect() error {
 	}
 	// RequestPty failure is non-fatal: IOS XR rejects PTY requests but
 	// still allows shell access. Pagination is disabled via 'terminal length 0'.
-	session.RequestPty("vt100", 24, 2000, modes)
+	if err = session.RequestPty("vt100", 24, 2000, modes); err != nil {
+		log.Debugf("[%s] PTY request rejected (non-fatal): %v", c.Host, err)
+	}
 
 	if err = session.Shell(); err != nil {
 		session.Close()
@@ -115,9 +121,14 @@ func (c *SSHConnection) Connect() error {
 		return err
 	}
 	c.session = session
+	log.Debugf("[%s] shell opened, waiting for initial prompt", c.Host)
 
-	c.RunCommand("")
-	c.RunCommand("terminal length 0")
+	if _, err = c.RunCommand(""); err != nil {
+		return errors.Wrap(err, "timeout waiting for initial prompt — consider increasing ssh.timeout")
+	}
+	if _, err = c.RunCommand("terminal length 0"); err != nil {
+		log.Debugf("[%s] 'terminal length 0' failed (non-fatal): %v", c.Host, err)
+	}
 
 	return nil
 }
@@ -129,18 +140,28 @@ type result struct {
 
 // RunCommand runs a command against the device
 func (c *SSHConnection) RunCommand(cmd string) (string, error) {
+	log.Debugf("[%s] sending: %q", c.Host, cmd)
+
 	if _, err := io.WriteString(c.stdin, cmd+"\n"); err != nil {
 		return "", err
 	}
 
 	outputChan := make(chan result, 1)
 	go func() {
-		c.readln(outputChan, cmd, c.buf)
+		c.readln(outputChan, c.buf)
 	}()
 	select {
 	case res := <-outputChan:
+		if res.err != nil {
+			log.Debugf("[%s] command %q returned error: %v", c.Host, cmd, res.err)
+		} else {
+			log.Debugf("[%s] command %q completed (%d bytes)", c.Host, cmd, len(res.output))
+		}
 		return res.output, res.err
 	case <-time.After(c.clientConfig.Timeout):
+		log.Debugf("[%s] command %q timed out, closing connection", c.Host, cmd)
+		// Close so the reader goroutine unblocks and exits cleanly.
+		c.Close()
 		return "", errors.New("Timeout reached")
 	}
 }
@@ -169,17 +190,24 @@ func loadPrivateKey(r io.Reader) (ssh.AuthMethod, error) {
 	return ssh.PublicKeys(key), nil
 }
 
-func (c *SSHConnection) readln(ch chan result, cmd string, r io.Reader) {
+// readln reads from r until the shell prompt (pattern: .+#) is detected.
+// We do not check for command echo in the output because some platforms
+// (e.g. IOS XR without PTY) do not echo commands back to the client.
+func (c *SSHConnection) readln(ch chan result, r io.Reader) {
 	buf := make([]byte, c.batchSize)
 	loadStr := ""
 	for {
 		n, err := r.Read(buf)
 		if err != nil {
+			log.Debugf("[%s] readln read error: %v", c.Host, err)
 			ch <- result{output: "", err: err}
 			return
 		}
-		loadStr += string(buf[:n])
-		if strings.Contains(loadStr, cmd) && promptRegexp.MatchString(loadStr) {
+		chunk := string(buf[:n])
+		log.Debugf("[%s] readln received %d bytes: %q", c.Host, n, chunk)
+		loadStr += chunk
+		if promptRegexp.MatchString(loadStr) {
+			log.Debugf("[%s] prompt detected", c.Host)
 			break
 		}
 	}
