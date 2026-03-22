@@ -117,14 +117,14 @@ func (c *interfaceCollector) Collect(client *rpc.Client, ch chan<- prometheus.Me
 		if item.OperStatus == "up" {
 			operStatus = 1
 		}
-		ch <- prometheus.MustNewConstMetric(receiveBytesDesc, prometheus.GaugeValue, item.InputBytes, l...)
-		ch <- prometheus.MustNewConstMetric(receiveErrorsDesc, prometheus.GaugeValue, item.InputErrors, l...)
-		ch <- prometheus.MustNewConstMetric(receiveDropsDesc, prometheus.GaugeValue, item.InputDrops, l...)
-		ch <- prometheus.MustNewConstMetric(transmitBytesDesc, prometheus.GaugeValue, item.OutputBytes, l...)
-		ch <- prometheus.MustNewConstMetric(transmitErrorsDesc, prometheus.GaugeValue, item.OutputErrors, l...)
-		ch <- prometheus.MustNewConstMetric(transmitDropsDesc, prometheus.GaugeValue, item.OutputDrops, l...)
-		ch <- prometheus.MustNewConstMetric(receiveBroadcastDesc, prometheus.GaugeValue, item.InputBroadcast, l...)
-		ch <- prometheus.MustNewConstMetric(receiveMulticastDesc, prometheus.GaugeValue, item.InputMulticast, l...)
+		ch <- prometheus.MustNewConstMetric(receiveBytesDesc, prometheus.CounterValue, item.InputBytes, l...)
+		ch <- prometheus.MustNewConstMetric(receiveErrorsDesc, prometheus.CounterValue, item.InputErrors, l...)
+		ch <- prometheus.MustNewConstMetric(receiveDropsDesc, prometheus.CounterValue, item.InputDrops, l...)
+		ch <- prometheus.MustNewConstMetric(transmitBytesDesc, prometheus.CounterValue, item.OutputBytes, l...)
+		ch <- prometheus.MustNewConstMetric(transmitErrorsDesc, prometheus.CounterValue, item.OutputErrors, l...)
+		ch <- prometheus.MustNewConstMetric(transmitDropsDesc, prometheus.CounterValue, item.OutputDrops, l...)
+		ch <- prometheus.MustNewConstMetric(receiveBroadcastDesc, prometheus.CounterValue, item.InputBroadcast, l...)
+		ch <- prometheus.MustNewConstMetric(receiveMulticastDesc, prometheus.CounterValue, item.InputMulticast, l...)
 		ch <- prometheus.MustNewConstMetric(adminStatusDesc, prometheus.GaugeValue, float64(adminStatus), l...)
 		ch <- prometheus.MustNewConstMetric(operStatusDesc, prometheus.GaugeValue, float64(operStatus), l...)
 		ch <- prometheus.MustNewConstMetric(errorStatusDesc, prometheus.GaugeValue, float64(errorStatus), l...)
