@@ -14,8 +14,10 @@ type Interface struct {
 	InputDrops  float64
 	OutputDrops float64
 
-	InputBytes  float64
-	OutputBytes float64
+	InputBytes   float64
+	OutputBytes  float64
+	InputPackets  float64
+	OutputPackets float64
 
 	InputBroadcast float64
 	InputMulticast float64

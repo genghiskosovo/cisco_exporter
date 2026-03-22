@@ -26,8 +26,8 @@ func (c *interfaceCollector) Parse(ostype string, output string) ([]Interface, e
 	multiBroadNXOS := regexp.MustCompile(`^.* (\d+) multicast packets\s+(\d+) broadcast packets$`)               // NX OS
 	multiBroadIOSXE := regexp.MustCompile(`^\s+Received\s+(\d+)\sbroadcasts \((\d+) (?:IP\s)?multicast(?:s)?\)`) // IOS XE
 	multiBroadIOS := regexp.MustCompile(`^\s*Received (\d+) broadcasts.*$`)                                      // IOS
-	inputBytesRegexp := regexp.MustCompile(`^\s+\d+ (?:packets input,|input packets)\s+(\d+) bytes.*$`)
-	outputBytesRegexp := regexp.MustCompile(`^\s+\d+ (?:packets output,|output packets)\s+(\d+) bytes.*$`)
+	inputBytesRegexp := regexp.MustCompile(`^\s+(\d+) (?:packets input,|input packets)\s+(\d+) bytes.*$`)
+	outputBytesRegexp := regexp.MustCompile(`^\s+(\d+) (?:packets output,|output packets)\s+(\d+) bytes.*$`)
 	inputErrorsRegexp := regexp.MustCompile(`^\s+(\d+) input error(?:s,)? .*$`)
 	outputErrorsRegexp := regexp.MustCompile(`^\s+(\d+) output error(?:s,)? .*$`)
 	speedRegexp := regexp.MustCompile(`^\s+(.*)-duplex,\s(\d+) ((\wb)/s).*$`)
@@ -75,9 +75,11 @@ func (c *interfaceCollector) Parse(ostype string, output string) ([]Interface, e
 			current.InputDrops = util.Str2float64(matches[1])
 			current.OutputDrops = util.Str2float64(matches[2])
 		} else if matches := inputBytesRegexp.FindStringSubmatch(line); matches != nil {
-			current.InputBytes = util.Str2float64(matches[1])
+			current.InputPackets = util.Str2float64(matches[1])
+			current.InputBytes = util.Str2float64(matches[2])
 		} else if matches := outputBytesRegexp.FindStringSubmatch(line); matches != nil {
-			current.OutputBytes = util.Str2float64(matches[1])
+			current.OutputPackets = util.Str2float64(matches[1])
+			current.OutputBytes = util.Str2float64(matches[2])
 		} else if matches := inputErrorsRegexp.FindStringSubmatch(line); matches != nil {
 			current.InputErrors = util.Str2float64(matches[1])
 		} else if matches := outputErrorsRegexp.FindStringSubmatch(line); matches != nil {
