@@ -127,11 +127,17 @@ func printVersion() {
 func startServer() {
 	log.Infof("Starting Cisco exporter (Version: %s)\n", version)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		deviceList := ""
+		for _, d := range devices {
+			deviceList += `<li><a href="` + *metricsPath + `?target=` + d.Host + `">` + d.Host + `</a></li>`
+		}
 		w.Write([]byte(`<html>
 			<head><title>Cisco Exporter (Version ` + version + `)</title></head>
 			<body>
 			<h1>Cisco Exporter</h1>
-			<p><a href="` + *metricsPath + `">Metrics</a></p>
+			<p><a href="` + *metricsPath + `">All devices</a></p>
+			<h2>Per-device links:</h2>
+			<ul>` + deviceList + `</ul>
 			<h2>More information:</h2>
 			<p><a href="https://github.com/lwlcom/cisco_exporter">github.com/lwlcom/cisco_exporter</a></p>
 			</body>
@@ -146,7 +152,26 @@ func startServer() {
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
 	reg := prometheus.NewRegistry()
 
-	c := newCiscoCollector(devices)
+	// If a specific target is requested, scrape only that device.
+	// This is the recommended pattern for multi-target exporters: each Prometheus
+	// scrape hits /metrics?target=<host> so slow devices don't block others.
+	target := r.URL.Query().Get("target")
+	targetDevices := devices
+	if target != "" {
+		targetDevices = nil
+		for _, d := range devices {
+			if d.Host == target {
+				targetDevices = []*connector.Device{d}
+				break
+			}
+		}
+		if len(targetDevices) == 0 {
+			http.Error(w, "unknown target: "+target, http.StatusBadRequest)
+			return
+		}
+	}
+
+	c := newCiscoCollector(targetDevices)
 	reg.MustRegister(c)
 
 	l := log.New()
