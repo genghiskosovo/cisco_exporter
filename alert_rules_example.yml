@@ -1,0 +1,308 @@
+groups:
+- name: alerts.rules
+  rules:
+  - alert: InstanceDownWarning
+    expr: avg_over_time(up[2m]) < 0.8
+    for: 2m
+    labels:
+      owner: noc
+      notify: noc_telegram
+      severity: warning
+    annotations:
+      summary: Instance {{ $labels.instance }} down
+      description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 2 minutes."
+
+  - alert: InstanceDownCritical
+    expr: avg_over_time(up[5m]) < 0.7
+    for: 5m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: Instance {{ $labels.instance }} down
+      description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 5 minutes."
+
+  - alert: Node_High_CPU_Warning
+    expr: jnxOperatingCPU > 90
+    for: 2m
+    labels:
+      owner: noc
+      notify: noc_telegram
+      severity: warning
+    annotations:
+      summary: Node {{ $labels.device }} CPU load is > 90%
+      description: Node {{ $labels.device }} with IP {{ $labels.instance }} CPU load is {{ $value }}%
+
+  - alert: Node_High_CPU_Critical
+    expr: jnxOperatingCPU > 95
+    for: 5m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: Node {{ $labels.device }} CPU load is > 95%
+      description: Node {{ $labels.device }} with IP {{ $labels.instance }} CPU load is {{ $value }}%
+
+########  Cisco CPU
+  - alert: CiscoCPUWarning
+    expr: cisco_facts_cpu_one_minute_percent > 80
+    for: 5m
+    labels:
+      owner: noc
+      notify: noc_telegram
+      severity: warning
+    annotations:
+      summary: High CPU on {{ $labels.target }}
+      description: "CPU utilization on {{ $labels.target }} is {{ $value | printf \"%.0f\" }}% (1-min avg) — above 80%"
+
+  - alert: CiscoCPUCritical
+    expr: cisco_facts_cpu_one_minute_percent > 95
+    for: 5m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: Critical CPU on {{ $labels.target }}
+      description: "CPU utilization on {{ $labels.target }} is {{ $value | printf \"%.0f\" }}% (1-min avg) — above 95%"
+
+########  Network Devices interfaces #############
+
+# ifOperStatus {ifAlias!~".*(?i:(test|noalarm)).*"}  - ovo omogucava da ako se na nekom interfejsu u desc stavi test ili noalarm da se alarm ne generise!
+  - alert: Juniper_LAG_Down
+    expr: ifOperStatus {ifAlias=~".+", ifName=~"ae\\d*"} and ifOperStatus {ifAlias!~".*(?i:(test|noalarm)).*", ifName=~"ae\\d*"} != 1
+    for: 1m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: Switch PortChannel Down (device {{ $labels.device }})
+      description: LAG Interface {{ $labels.ifDescr }} on Juniper {{ $labels.device }} with description "{{ $labels.ifAlias }}" is down!
+
+  - alert: Nexus_portchannel_Down
+    expr: cisco_interface_up{name=~"port-channel.*",description!~".*(?i:(test|noalarm)).*"} == 0
+    for: 1m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: Switch PortChannel Down!
+      description: PortChannel {{ $labels.name}} on switch {{ $labels.target }} with description "{{ $labels.description }}" is down!
+
+  - alert: Juniper_interface_Down
+    expr: ifOperStatus {ifAlias=~"to_.*", ifName!~"ae.*"} and ifOperStatus {ifAlias!~".*(?i:(test|noalarm)).*"} != 1
+    for: 1m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: Juniper Interface Down
+      description: Interface {{ $labels.ifDescr }} on Juniper {{ $labels.device }} with description "{{ $labels.ifAlias }}" is down!
+
+  - alert: CiscoInterfaceDown
+    # Fires when admin is up but oper is down (admin_up - up == 1).
+    # Filters to uplink ports (description starts with "to_"), skips test/noalarm ports.
+    expr: cisco_interface_admin_up - cisco_interface_up{description!~".*(?i:(test|noalarm)).*",description=~"to_.*",name=~"(Eth|Gig|Ten).*"} == 1
+    for: 1m
+    labels:
+      owner: noc
+      notify: noc_telegram
+      severity: warning
+    annotations:
+      summary: Switch Port Issue
+      description: Interface {{ $labels.name}} on switch {{ $labels.target }} with description "{{ $labels.description }}" is down!
+
+########  Interface error ratios
+# Denominator is packets (not bytes) because errors are per-packet events.
+# A CRC error or drop happens to one packet regardless of its size, so
+# errors/packets is size-invariant. errors/bytes would silently under-fire
+# on jumbo-frame links.
+# Guard (> 100 pps) avoids false positives on near-idle interfaces.
+
+  - alert: CiscoInterfaceRxErrorRatioWarning
+    expr: |
+      (
+        rate(cisco_interface_receive_errors[5m]) +
+        rate(cisco_interface_receive_drops[5m])
+      )
+      /
+      clamp_min(
+        rate(cisco_interface_receive_packets[5m]),
+        1
+      ) > 1e-5
+      and
+      rate(cisco_interface_receive_packets[5m]) > 100
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "RX errors on {{ $labels.target }} {{ $labels.name }}"
+      description: "Receive error ratio > 1 per 100,000 packets — early signal of CRC or input drops"
+
+  - alert: CiscoInterfaceRxErrorRatioCritical
+    expr: |
+      (
+        rate(cisco_interface_receive_errors[5m]) +
+        rate(cisco_interface_receive_drops[5m])
+      )
+      /
+      clamp_min(
+        rate(cisco_interface_receive_packets[5m]),
+        1
+      ) > 1e-4
+      and
+      rate(cisco_interface_receive_packets[5m]) > 100
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "HIGH RX errors on {{ $labels.target }} {{ $labels.name }}"
+      description: "Receive error ratio > 1 per 10,000 packets — likely CRC, input drops, or upstream issue"
+
+  - alert: CiscoInterfaceTxErrorRatioWarning
+    expr: |
+      (
+        rate(cisco_interface_transmit_errors[5m]) +
+        rate(cisco_interface_transmit_drops[5m])
+      )
+      /
+      clamp_min(
+        rate(cisco_interface_transmit_packets[5m]),
+        1
+      ) > 1e-5
+      and
+      rate(cisco_interface_transmit_packets[5m]) > 100
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "TX errors on {{ $labels.target }} {{ $labels.name }}"
+      description: "Transmit error ratio > 1 per 100,000 packets — likely early congestion or output drops"
+
+  - alert: CiscoInterfaceTxErrorRatioCritical
+    expr: |
+      (
+        rate(cisco_interface_transmit_errors[5m]) +
+        rate(cisco_interface_transmit_drops[5m])
+      )
+      /
+      clamp_min(
+        rate(cisco_interface_transmit_packets[5m]),
+        1
+      ) > 1e-4
+      and
+      rate(cisco_interface_transmit_packets[5m]) > 100
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "HIGH TX errors on {{ $labels.target }} {{ $labels.name }}"
+      description: "Transmit error ratio > 1 per 10,000 packets — likely congestion or egress drops"
+
+########  BGP status
+  - alert: Juniper_BGP_Down
+    expr: bgpPeerState < 6
+    for: 1m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: BGP peer Down (device {{ $labels.device }})
+      description: BGP peer {{ $labels.bgpPeerRemoteAddr }} is DOWN!
+
+  - alert: CISCO_BGP_Down
+    expr: cisco_bgp_session_up == 0
+    for: 1m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: BGP peer Down
+      description: BGP peer {{ $labels.description }} (ASN {{ $labels.asn }}) on {{ $labels.target }} is DOWN!
+
+########  Power supply failed
+  - alert: Nexus_power_supply_Down
+    expr: cisco_environment_power_up == 0
+    for: 3m
+    labels:
+      owner: noc
+      notify: noc_telegram
+      severity: warning
+    annotations:
+      summary: Power Issue on {{ $labels.target }}
+      description: Power supply {{ $labels.item }} ({{ $labels.status }}) failed on {{ $labels.target }}.
+
+  - alert: Juniper_power_supply_Down
+    expr: jnxOperatingState{jnxOperatingContentsIndex="2"} != 2
+    for: 3m
+    labels:
+      owner: noc
+      notify: noc_telegram
+      severity: warning
+    annotations:
+      summary: Power Issue with (device {{ $labels.device }})
+      description: Power supply {{ $labels.jnxOperatingDescr}} failed on {{ $labels.device }}.
+
+########  ICMP Blackbox
+  - alert: DeviceNotPingable
+    expr: avg_over_time(probe_success{job="blackbox_icmp"}[1m]) < 0.65
+    for: 1m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: Probe unsuccessful
+      description: "{{ $labels.instance }} of job {{ $labels.job }} with module {{ $labels.module }} has been unsuccessful for more than 1m."
+
+########  Temperature alarms
+  - alert: Juniper_TEMP_WARNING
+    expr: jnxOperatingTemp{jnxOperatingL1Index=~"1|2", jnxOperatingContentsIndex="9"} > 64
+    for: 5m
+    labels:
+      owner: noc
+      notify: noc_telegram
+      severity: warning
+    annotations:
+      summary: Temperature warning (device {{ $labels.device }})
+      description: Temperature of {{ $labels.jnxOperatingDescr }} on device {{ $labels.device }} passed 64 C degrees!
+
+  - alert: Juniper_TEMP_CRITICAL
+    expr: jnxOperatingTemp{jnxOperatingL1Index=~"1|2", jnxOperatingContentsIndex="9"} > 70
+    for: 3m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: Temperature critical (device {{ $labels.device }})
+      description: Temperature of {{ $labels.jnxOperatingDescr }} on device {{ $labels.device }} passed 70 C degrees!
+
+  - alert: Nexus_TEMP_WARNING
+    expr: cisco_environment_sensor_temp{item=~".*D2.*"} > 60
+    for: 5m
+    labels:
+      owner: noc
+      notify: noc_telegram
+      severity: warning
+    annotations:
+      summary: Temperature warning on {{ $labels.target }}
+      description: Temperature of device {{ $labels.target }} passed 60 C degrees!
+
+  - alert: Nexus_TEMP_CRITICAL
+    expr: cisco_environment_sensor_temp{item=~".*D2.*"} > 70
+    for: 3m
+    labels:
+      owner: noc
+      notify: noc_call noc_telegram
+      severity: critical
+    annotations:
+      summary: Temperature critical on {{ $labels.target }}
+      description: Temperature of device {{ $labels.target }} passed 70 C degrees!
