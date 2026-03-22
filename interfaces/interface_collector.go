@@ -1,23 +1,23 @@
 package interfaces
 
 import (
-	"log"
-
-	"github.com/lwlcom/cisco_exporter/rpc"
-
 	"github.com/lwlcom/cisco_exporter/collector"
+	"github.com/lwlcom/cisco_exporter/rpc"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 const prefix string = "cisco_interface_"
 
 var (
 	receiveBytesDesc       *prometheus.Desc
+	receivePacketsDesc     *prometheus.Desc
 	receiveErrorsDesc      *prometheus.Desc
 	receiveDropsDesc       *prometheus.Desc
 	receiveBroadcastDesc   *prometheus.Desc
 	receiveMulticastDesc   *prometheus.Desc
 	transmitBytesDesc      *prometheus.Desc
+	transmitPacketsDesc    *prometheus.Desc
 	transmitErrorsDesc     *prometheus.Desc
 	transmitDropsDesc      *prometheus.Desc
 	adminStatusDesc        *prometheus.Desc
@@ -28,11 +28,13 @@ var (
 func init() {
 	l := []string{"target", "name", "description", "mac", "speed"}
 	receiveBytesDesc = prometheus.NewDesc(prefix+"receive_bytes", "Received data in bytes", l, nil)
+	receivePacketsDesc = prometheus.NewDesc(prefix+"receive_packets", "Received packets", l, nil)
 	receiveErrorsDesc = prometheus.NewDesc(prefix+"receive_errors", "Number of errors caused by incoming packets", l, nil)
 	receiveDropsDesc = prometheus.NewDesc(prefix+"receive_drops", "Number of dropped incoming packets", l, nil)
 	receiveBroadcastDesc = prometheus.NewDesc(prefix+"receive_broadcast", "Received broadcast packets", l, nil)
 	receiveMulticastDesc = prometheus.NewDesc(prefix+"receive_multicast", "Received multicast packets", l, nil)
 	transmitBytesDesc = prometheus.NewDesc(prefix+"transmit_bytes", "Transmitted data in bytes", l, nil)
+	transmitPacketsDesc = prometheus.NewDesc(prefix+"transmit_packets", "Transmitted packets", l, nil)
 	transmitErrorsDesc = prometheus.NewDesc(prefix+"transmit_errors", "Number of errors caused by outgoing packets", l, nil)
 	transmitDropsDesc = prometheus.NewDesc(prefix+"transmit_drops", "Number of dropped outgoing packets", l, nil)
 	adminStatusDesc = prometheus.NewDesc(prefix+"admin_up", "Admin operational status", l, nil)
@@ -56,11 +58,13 @@ func (*interfaceCollector) Name() string {
 // Describe describes the metrics
 func (*interfaceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- receiveBytesDesc
+	ch <- receivePacketsDesc
 	ch <- receiveErrorsDesc
 	ch <- receiveDropsDesc
 	ch <- receiveBroadcastDesc
 	ch <- receiveMulticastDesc
 	ch <- transmitBytesDesc
+	ch <- transmitPacketsDesc
 	ch <- transmitDropsDesc
 	ch <- transmitErrorsDesc
 	ch <- adminStatusDesc
@@ -119,14 +123,16 @@ func (c *interfaceCollector) Collect(client *rpc.Client, ch chan<- prometheus.Me
 		if item.OperStatus == "up" {
 			operStatus = 1
 		}
-		ch <- prometheus.MustNewConstMetric(receiveBytesDesc, prometheus.GaugeValue, item.InputBytes, l...)
-		ch <- prometheus.MustNewConstMetric(receiveErrorsDesc, prometheus.GaugeValue, item.InputErrors, l...)
-		ch <- prometheus.MustNewConstMetric(receiveDropsDesc, prometheus.GaugeValue, item.InputDrops, l...)
-		ch <- prometheus.MustNewConstMetric(transmitBytesDesc, prometheus.GaugeValue, item.OutputBytes, l...)
-		ch <- prometheus.MustNewConstMetric(transmitErrorsDesc, prometheus.GaugeValue, item.OutputErrors, l...)
-		ch <- prometheus.MustNewConstMetric(transmitDropsDesc, prometheus.GaugeValue, item.OutputDrops, l...)
-		ch <- prometheus.MustNewConstMetric(receiveBroadcastDesc, prometheus.GaugeValue, item.InputBroadcast, l...)
-		ch <- prometheus.MustNewConstMetric(receiveMulticastDesc, prometheus.GaugeValue, item.InputMulticast, l...)
+		ch <- prometheus.MustNewConstMetric(receiveBytesDesc, prometheus.CounterValue, item.InputBytes, l...)
+		ch <- prometheus.MustNewConstMetric(receivePacketsDesc, prometheus.CounterValue, item.InputPackets, l...)
+		ch <- prometheus.MustNewConstMetric(receiveErrorsDesc, prometheus.CounterValue, item.InputErrors, l...)
+		ch <- prometheus.MustNewConstMetric(receiveDropsDesc, prometheus.CounterValue, item.InputDrops, l...)
+		ch <- prometheus.MustNewConstMetric(transmitBytesDesc, prometheus.CounterValue, item.OutputBytes, l...)
+		ch <- prometheus.MustNewConstMetric(transmitPacketsDesc, prometheus.CounterValue, item.OutputPackets, l...)
+		ch <- prometheus.MustNewConstMetric(transmitErrorsDesc, prometheus.CounterValue, item.OutputErrors, l...)
+		ch <- prometheus.MustNewConstMetric(transmitDropsDesc, prometheus.CounterValue, item.OutputDrops, l...)
+		ch <- prometheus.MustNewConstMetric(receiveBroadcastDesc, prometheus.CounterValue, item.InputBroadcast, l...)
+		ch <- prometheus.MustNewConstMetric(receiveMulticastDesc, prometheus.CounterValue, item.InputMulticast, l...)
 		ch <- prometheus.MustNewConstMetric(adminStatusDesc, prometheus.GaugeValue, float64(adminStatus), l...)
 		ch <- prometheus.MustNewConstMetric(operStatusDesc, prometheus.GaugeValue, float64(operStatus), l...)
 		ch <- prometheus.MustNewConstMetric(errorStatusDesc, prometheus.GaugeValue, float64(errorStatus), l...)

@@ -9,35 +9,63 @@ import (
 	"github.com/lwlcom/cisco_exporter/util"
 )
 
-// ParseInterfaces parses cli output and returns list of interface names
+// sfpCapablePrefixes lists interface name prefixes that can physically hold an SFP/transceiver.
+// FastEthernet, Vlan, Loopback, Tunnel, Port-channel etc. are excluded.
+var sfpCapablePrefixes = []string{
+	"GigabitEthernet",
+	"TenGigabitEthernet",
+	"TwentyFiveGigE",
+	"FortyGigabitEthernet",
+	"HundredGigabitEthernet",
+	"Ethernet", // NX-OS physical ports
+}
+
+func hasSFPCapablePrefix(name string) bool {
+	for _, prefix := range sfpCapablePrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// ParseInterfaces parses cli output and returns list of SFP-capable interface names
 func (c *opticsCollector) ParseInterfaces(ostype string, output string) ([]string, error) {
 	if ostype != rpc.IOSXE && ostype != rpc.NXOS && ostype != rpc.IOS {
 		return nil, errors.New("'show interfaces stats' is not implemented for " + ostype)
 	}
 	var items []string
-	deviceNameRegexp, _ := regexp.Compile(`^([a-zA-Z0-9\/\.-]+)\s*`)
+	deviceNameRegexp := regexp.MustCompile(`^([a-zA-Z0-9\/\.-]+)\s*`)
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		matches := deviceNameRegexp.FindStringSubmatch(line)
 		if matches == nil {
 			continue
 		}
-		items = append(items, matches[1])
+		name := matches[1]
+		// For IOS/IOSXE, skip interfaces that cannot have optical transceivers.
+		// NXOS already filters sfpAbsent at the command level.
+		if ostype != rpc.NXOS && !hasSFPCapablePrefix(name) {
+			continue
+		}
+		items = append(items, name)
 	}
 	return items, nil
 }
 
+var transceiverRegexp = map[string]*regexp.Regexp{
+	rpc.IOS:   regexp.MustCompile(`\S+\s+(?:(?:-)?\d+\.\d+)\s+(?:(?:-)?\d+\.\d+)\s+((?:-)?\d+\.\d+)\s+((?:-)?\d+\.\d+)\s*`),
+	rpc.NXOS:  regexp.MustCompile(`\s*Tx Power\s*((?:-)?\d+\.\d+).*\s*Rx Power\s*((?:-)?\d+\.\d+).*`),
+	rpc.IOSXE: regexp.MustCompile(`\s+Transceiver Tx power\s+= ((?:-)?\d+\.\d+).*\s*Transceiver Rx optical power\s+= ((?:-)?\d+\.\d+).*`),
+}
+
 // ParseTransceiver parses cli output and tries to find tx/rx power for an interface
 func (c *opticsCollector) ParseTransceiver(ostype string, output string) (Optics, error) {
-	if ostype != rpc.IOSXE && ostype != rpc.NXOS && ostype != rpc.IOS {
+	re, ok := transceiverRegexp[ostype]
+	if !ok {
 		return Optics{}, errors.New("Transceiver data is not implemented for " + ostype)
 	}
-	transceiverRegexp := make(map[string]*regexp.Regexp)
-	transceiverRegexp[rpc.IOS], _ = regexp.Compile(`\S+\s+(?:(?:-)?\d+\.\d+)\s+(?:(?:-)?\d+\.\d+)\s+((?:-)?\d+\.\d+)\s+((?:-)?\d+\.\d+)\s*`)
-	transceiverRegexp[rpc.NXOS], _ = regexp.Compile(`\s*Tx Power\s*((?:-)?\d+\.\d+).*\s*Rx Power\s*((?:-)?\d+\.\d+).*`)
-	transceiverRegexp[rpc.IOSXE], _ = regexp.Compile(`\s+Transceiver Tx power\s+= ((?:-)?\d+\.\d+).*\s*Transceiver Rx optical power\s+= ((?:-)?\d+\.\d+).*`)
-
-	matches := transceiverRegexp[ostype].FindStringSubmatch(output)
+	matches := re.FindStringSubmatch(output)
 	if matches == nil {
 		return Optics{}, errors.New("Transceiver not found")
 	}

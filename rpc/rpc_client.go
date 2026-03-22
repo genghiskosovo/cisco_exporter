@@ -2,12 +2,10 @@ package rpc
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
-	"log"
-
 	"github.com/lwlcom/cisco_exporter/connector"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -15,7 +13,6 @@ const (
 	NXOS  string = "NXOS"
 	IOS   string = "IOS"
 	IOSXR string = "IOSXR"
-
 )
 
 // Client sends commands to a Cisco device
@@ -61,9 +58,9 @@ func (c *Client) RunCommand(cmd string) (string, error) {
 	if c.Debug {
 		log.Printf("Running command on %s: %s\n", c.conn.Host, cmd)
 	}
-	output, err := c.conn.RunCommand(fmt.Sprintf("%s", cmd))
+	output, err := c.conn.RunCommand(cmd)
 	if err != nil {
-		println(err.Error())
+		log.Errorf("Command error on %s: %s\n", c.conn.Host, err.Error())
 		return "", err
 	}
 
