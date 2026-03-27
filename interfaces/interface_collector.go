@@ -19,8 +19,8 @@ var (
 	transmitBytesDesc      *prometheus.Desc
 	transmitPacketsDesc    *prometheus.Desc
 	transmitErrorsDesc     *prometheus.Desc
-	transmitDropsDesc      *prometheus.Desc
-	adminStatusDesc        *prometheus.Desc
+	transmitDropsDesc  *prometheus.Desc
+	adminStatusDesc    *prometheus.Desc
 	operStatusDesc         *prometheus.Desc
 	errorStatusDesc        *prometheus.Desc
 )

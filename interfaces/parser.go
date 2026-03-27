@@ -23,9 +23,11 @@ func (c *interfaceCollector) Parse(ostype string, output string) ([]Interface, e
 	adminStatusNXOSRegexp := regexp.MustCompile(`^\S+ is (up|down)(?:\s|,)?(\(Administratively down\))?.*$`)
 	descRegexp := regexp.MustCompile(`^\s+Description: (.*)$`)
 	dropsRegexp := regexp.MustCompile(`^\s+Input queue: \d+\/\d+\/(\d+)\/\d+ .+ Total output drops: (\d+)$`)
-	multiBroadNXOS := regexp.MustCompile(`^.* (\d+) multicast packets\s+(\d+) broadcast packets$`)               // NX OS
-	multiBroadIOSXE := regexp.MustCompile(`^\s+Received\s+(\d+)\sbroadcasts \((\d+) (?:IP\s)?multicast(?:s)?\)`) // IOS XE
-	multiBroadIOS := regexp.MustCompile(`^\s*Received (\d+) broadcasts.*$`)                                      // IOS
+	multiBroadNXOS    := regexp.MustCompile(`^.* (\d+) multicast packets\s+(\d+) broadcast packets$`)               // NX-OS RX and TX
+	multiBroadIOSXE   := regexp.MustCompile(`^\s+Received\s+(\d+)\sbroadcasts \((\d+) (?:IP\s)?multicast(?:s)?\)`) // IOS/IOS-XE RX
+	multiBroadIOS     := regexp.MustCompile(`^\s*Received (\d+) broadcasts.*$`)                                    // IOS router RX broadcast
+	iosRxMulticast    := regexp.MustCompile(`^\s+\d+ watchdog, (\d+) multicast, \d+ pause input`)                  // IOS router RX multicast
+	iosxrRxBroadMcast := regexp.MustCompile(`^\s+Received (\d+) broadcast packets, (\d+) multicast packets`)       // IOS-XR RX
 	inputBytesRegexp := regexp.MustCompile(`^\s+(\d+) (?:packets input,|input packets)\s+(\d+) bytes.*$`)
 	outputBytesRegexp := regexp.MustCompile(`^\s+(\d+) (?:packets output,|output packets)\s+(\d+) bytes.*$`)
 	inputErrorsRegexp := regexp.MustCompile(`^\s+(\d+) input error(?:s,)? .*$`)
@@ -93,11 +95,16 @@ func (c *interfaceCollector) Parse(ostype string, output string) ([]Interface, e
 				current.InputMulticast = util.Str2float64(matches[1])
 				current.InputBroadcast = util.Str2float64(matches[2])
 			}
+		} else if matches := iosxrRxBroadMcast.FindStringSubmatch(line); matches != nil {
+			current.InputBroadcast = util.Str2float64(matches[1])
+			current.InputMulticast = util.Str2float64(matches[2])
 		} else if matches := multiBroadIOSXE.FindStringSubmatch(line); matches != nil {
 			current.InputBroadcast = util.Str2float64(matches[1])
 			current.InputMulticast = util.Str2float64(matches[2])
 		} else if matches := multiBroadIOS.FindStringSubmatch(line); matches != nil {
 			current.InputBroadcast = util.Str2float64(matches[1])
+		} else if matches := iosRxMulticast.FindStringSubmatch(line); matches != nil {
+			current.InputMulticast = util.Str2float64(matches[1])
 		}
 	}
 	return append(items, current), nil
