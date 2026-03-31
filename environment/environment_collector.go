@@ -42,6 +42,9 @@ func (*environmentCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect collects metrics from Cisco
 func (c *environmentCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
+	if client.OSType == rpc.IOSXR {
+		return nil
+	}
 	out, err := client.RunCommand("show environment")
 	if err != nil {
 		return err

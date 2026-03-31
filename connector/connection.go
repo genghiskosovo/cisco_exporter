@@ -102,8 +102,14 @@ func (c *SSHConnection) Connect() error {
 	session.Shell()
 	c.session = session
 
-	c.RunCommand("")
-	c.RunCommand("terminal length 0")
+	if _, err := c.RunCommand(""); err != nil {
+		c.client.Conn.Close()
+		return errors.Wrap(err, "could not drain initial prompt")
+	}
+	if _, err := c.RunCommand("terminal length 0"); err != nil {
+		c.client.Conn.Close()
+		return errors.Wrap(err, "could not set terminal length")
+	}
 
 	return nil
 }

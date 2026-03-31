@@ -43,16 +43,19 @@ func (*opticsCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect collects metrics from Cisco
 func (c *opticsCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
-	var iflistcmd string
+	// NX-OS: single bulk command returns all optical transceivers at once
+	if client.OSType == rpc.NXOS {
+		return c.collectNXOS(client, ch, labelValues)
+	}
 
+	var iflistcmd string
 	switch client.OSType {
 	case rpc.IOS, rpc.IOSXE:
 		iflistcmd = "show interfaces stats | exclude disabled"
-	case rpc.NXOS:
-		iflistcmd = "show interface status | exclude disabled | exclude notconn | exclude sfpAbsent | exclude --------------------------------------------------------------------------------"
+	default:
+		return nil
 	}
 	out, err := client.RunCommand(iflistcmd)
-
 	if err != nil {
 		return err
 	}
@@ -64,14 +67,12 @@ func (c *opticsCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metri
 		return nil
 	}
 
-	xeDev, _ := regexp.Compile(`\S(\d+)/(\d+)/(\d+)`)
+	xeDev := regexp.MustCompile(`\S(\d+)/(\d+)/(\d+)`)
 
 	for _, i := range interfaces {
 		switch client.OSType {
 		case rpc.IOS:
 			out, err = client.RunCommand("show interfaces " + i + " transceiver")
-		case rpc.NXOS:
-			out, err = client.RunCommand("show interface " + i + " transceiver details")
 		case rpc.IOSXE:
 			matches := xeDev.FindStringSubmatch(i)
 			if matches == nil {
@@ -93,10 +94,30 @@ func (c *opticsCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metri
 			continue
 		}
 		l := append(labelValues, i)
-
 		ch <- prometheus.MustNewConstMetric(opticsTXDesc, prometheus.GaugeValue, float64(optic.TxPower), l...)
 		ch <- prometheus.MustNewConstMetric(opticsRXDesc, prometheus.GaugeValue, float64(optic.RxPower), l...)
 	}
 
+	return nil
+}
+
+// collectNXOS fetches all transceiver data in a single command
+func (c *opticsCollector) collectNXOS(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
+	out, err := client.RunCommand("show interface transceiver details")
+	if err != nil {
+		return err
+	}
+	items, err := c.ParseTransceiverBulk(out)
+	if err != nil {
+		if client.Debug {
+			log.Printf("ParseTransceiverBulk for %s: %s\n", labelValues[0], err.Error())
+		}
+		return nil
+	}
+	for iface, optic := range items {
+		l := append(labelValues, iface)
+		ch <- prometheus.MustNewConstMetric(opticsTXDesc, prometheus.GaugeValue, float64(optic.TxPower), l...)
+		ch <- prometheus.MustNewConstMetric(opticsRXDesc, prometheus.GaugeValue, float64(optic.RxPower), l...)
+	}
 	return nil
 }

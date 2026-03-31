@@ -53,9 +53,13 @@ func (*factsCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // CollectVersion collects version informations from Cisco
 func (c *factsCollector) CollectVersion(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
-	out, err := client.RunCommand("show version")
-	if err != nil {
-		return err
+	out := client.ShowVersionCache
+	if out == "" {
+		var err error
+		out, err = client.RunCommand("show version")
+		if err != nil {
+			return err
+		}
 	}
 	item, err := c.ParseVersion(client.OSType, out)
 	if err != nil {
@@ -68,6 +72,9 @@ func (c *factsCollector) CollectVersion(client *rpc.Client, ch chan<- prometheus
 
 // CollectMemory collects memory informations from Cisco
 func (c *factsCollector) CollectMemory(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
+	if client.OSType == rpc.NXOS {
+		return nil
+	}
 	var memorycmd string
 	if client.OSType == rpc.IOSXR {
 		memorycmd = "show memory summary"
@@ -94,6 +101,9 @@ func (c *factsCollector) CollectMemory(client *rpc.Client, ch chan<- prometheus.
 
 // CollectCPU collects cpu informations from Cisco
 func (c *factsCollector) CollectCPU(client *rpc.Client, ch chan<- prometheus.Metric, labelValues []string) error {
+	if client.OSType == rpc.NXOS {
+		return nil
+	}
 	out, err := client.RunCommand("show process cpu")
 	if err != nil {
 		return err
