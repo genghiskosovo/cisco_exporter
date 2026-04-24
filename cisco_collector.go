@@ -66,33 +66,37 @@ func (c *ciscoCollector) collectForHost(device *connector.Device, ch chan<- prom
 	l := []string{device.Host}
 
 	t := time.Now()
+	log.Infof("Scraping %s", device.Host)
 	defer func() {
 		ch <- prometheus.MustNewConstMetric(scrapeDurationDesc, prometheus.GaugeValue, time.Since(t).Seconds(), l...)
+		log.Infof("Finished scraping %s in %s", device.Host, time.Since(t).Round(time.Millisecond))
 	}()
 
 	conn, err := connector.NewSSHConnection(device, cfg)
 	if err != nil {
-		log.Errorln(err)
+		log.Errorf("%s: SSH connection failed: %v", device.Host, err)
 		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 0, l...)
 		return
 	}
 	defer conn.Close()
 
-	ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 1, l...)
-
 	client := rpc.NewClient(conn, cfg.Debug)
 	err = client.Identify()
 	if err != nil {
-		log.Errorln(device.Host + ": " + err.Error())
+		log.Errorf("%s: identify failed: %v", device.Host, err)
+		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 0, l...)
 		return
 	}
+
+	log.Infof("%s: identified as %s", device.Host, client.OSType)
+	ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 1, l...)
 
 	for _, col := range c.collectors.collectorsForDevice(device) {
 		ct := time.Now()
 		err := col.Collect(client, ch, l)
 
 		if err != nil && err.Error() != "EOF" {
-			log.Errorln(col.Name() + ": " + err.Error())
+			log.Errorf("%s: collector %s failed: %v", device.Host, col.Name(), err)
 		}
 
 		ch <- prometheus.MustNewConstMetric(scrapeCollectorDurationDesc, prometheus.GaugeValue, time.Since(ct).Seconds(), append(l, col.Name())...)

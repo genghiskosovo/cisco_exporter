@@ -162,7 +162,13 @@ func loadPrivateKey(r io.Reader) (ssh.AuthMethod, error) {
 }
 
 func (c *SSHConnection) readln(ch chan result, cmd string, r io.Reader) {
-	re := regexp.MustCompile(`.+#\s?$`)
+	// A Cisco prompt is always a hostname (no spaces) followed by optional
+	// context and '#'. Matching only the last line (after the final '\n')
+	// prevents false positives when interface descriptions contain '#' and
+	// a TCP chunk boundary lands right after it.
+	// Allow optional leading/trailing \r: PTY sessions often emit \r before
+	// the prompt (CR without LF) and CRLF line endings leave a trailing \r.
+	promptRe := regexp.MustCompile(`^\r?\S+#\s?\r?$`)
 	buf := make([]byte, c.batchSize)
 	loadStr := ""
 	for {
@@ -172,8 +178,12 @@ func (c *SSHConnection) readln(ch chan result, cmd string, r io.Reader) {
 			return
 		}
 		loadStr += string(buf[:n])
-		if strings.Contains(loadStr, cmd) && re.MatchString(loadStr) {
-			break
+		if strings.Contains(loadStr, cmd) {
+			lastNewline := strings.LastIndex(loadStr, "\n")
+			lastLine := loadStr[lastNewline+1:]
+			if promptRe.MatchString(lastLine) {
+				break
+			}
 		}
 	}
 	loadStr = strings.Replace(loadStr, "\r", "", -1)

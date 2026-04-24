@@ -50,7 +50,6 @@ func (c *Client) Identify() error {
 		}
 		return nil
 	}
-
 	// "show version brief" was rejected or returned non-XR output —
 	// fall back to full "show version" for IOS/IOS-XE/NX-OS
 	output, err := c.RunCommand("show version")
