@@ -30,10 +30,12 @@ var (
 	debug              = flag.Bool("debug", false, "Show verbose debug output in log")
 	legacyCiphers      = flag.Bool("legacy.ciphers", false, "Allow legacy CBC ciphers")
 	bgpEnabled         = flag.Bool("bgp.enabled", true, "Scrape bgp metrics")
+	cdpEnabled         = flag.Bool("cdp.enabled", true, "Scrape CDP neighbor metrics")
 	environmentEnabled = flag.Bool("environment.enabled", true, "Scrape environment metrics")
 	factsEnabled       = flag.Bool("facts.enabled", true, "Scrape system metrics")
 	interfacesEnabled  = flag.Bool("interfaces.enabled", true, "Scrape interface metrics")
 	opticsEnabled      = flag.Bool("optics.enabled", true, "Scrape optic metrics")
+	stpEnabled         = flag.Bool("stp.enabled", true, "Scrape spanning tree metrics")
 	configFile         = flag.String("config.file", "", "Path to config file")
 	devices            []*connector.Device
 	cfg                *config.Config
@@ -109,11 +111,12 @@ func loadConfigFromFlags() *config.Config {
 
 	f := c.Features
 	f.BGP = bgpEnabled
+	f.CDP = cdpEnabled
 	f.Environment = environmentEnabled
 	f.Facts = factsEnabled
 	f.Interfaces = interfacesEnabled
 	f.Optics = opticsEnabled
-
+	f.Stp = stpEnabled
 	return c
 }
 

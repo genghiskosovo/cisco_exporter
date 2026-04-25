@@ -36,10 +36,12 @@ type DeviceConfig struct {
 // FeatureConfig is the list of collectors enabled or disabled
 type FeatureConfig struct {
 	BGP         *bool `yaml:"bgp,omitempty"`
+	CDP         *bool `yaml:"cdp,omitempty"`
 	Environment *bool `yaml:"environment,omitempty"`
 	Facts       *bool `yaml:"facts,omitempty"`
 	Interfaces  *bool `yaml:"interfaces,omitempty"`
 	Optics      *bool `yaml:"optics,omitempty"`
+	Stp         *bool `yaml:"stp"`
 }
 
 // New creates a new config
@@ -72,6 +74,9 @@ func Load(reader io.Reader) (*Config, error) {
 		if d.Features.BGP == nil {
 			d.Features.BGP = c.Features.BGP
 		}
+		if d.Features.CDP == nil {
+			d.Features.CDP = c.Features.CDP
+		}
 		if d.Features.Environment == nil {
 			d.Features.Environment = c.Features.Environment
 		}
@@ -83,6 +88,9 @@ func Load(reader io.Reader) (*Config, error) {
 		}
 		if d.Features.Optics == nil {
 			d.Features.Optics = c.Features.Optics
+		}
+		if d.Features.Stp == nil {
+			d.Features.Stp = c.Features.Stp
 		}
 	}
 
@@ -98,6 +106,8 @@ func (c *Config) setDefaultValues() {
 	f := c.Features
 	bgp := true
 	f.BGP = &bgp
+	cdp := true
+	f.CDP = &cdp
 	environment := true
 	f.Environment = &environment
 	facts := true
@@ -106,6 +116,8 @@ func (c *Config) setDefaultValues() {
 	f.Interfaces = &interfaces
 	optics := true
 	f.Optics = &optics
+	stp := true
+	f.Stp = &stp
 }
 
 // DevicesFromTargets creates devices configs from targets list

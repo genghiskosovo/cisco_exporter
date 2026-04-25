@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/lwlcom/cisco_exporter/bgp"
+	"github.com/lwlcom/cisco_exporter/cdp"
 	"github.com/lwlcom/cisco_exporter/collector"
 	"github.com/lwlcom/cisco_exporter/config"
 	"github.com/lwlcom/cisco_exporter/connector"
@@ -9,6 +10,7 @@ import (
 	"github.com/lwlcom/cisco_exporter/facts"
 	"github.com/lwlcom/cisco_exporter/interfaces"
 	"github.com/lwlcom/cisco_exporter/optics"
+	"github.com/lwlcom/cisco_exporter/spanningtree"
 )
 
 type collectors struct {
@@ -36,10 +38,12 @@ func (c *collectors) initCollectorsForDevice(device *connector.Device) {
 
 	c.devices[device.Host] = make([]collector.RPCCollector, 0)
 	c.addCollectorIfEnabledForDevice(device, "bgp", f.BGP, bgp.NewCollector)
+	c.addCollectorIfEnabledForDevice(device, "cdp", f.CDP, cdp.NewCollector)
 	c.addCollectorIfEnabledForDevice(device, "environment", f.Environment, environment.NewCollector)
 	c.addCollectorIfEnabledForDevice(device, "facts", f.Facts, facts.NewCollector)
 	c.addCollectorIfEnabledForDevice(device, "interfaces", f.Interfaces, interfaces.NewCollector)
 	c.addCollectorIfEnabledForDevice(device, "optics", f.Optics, optics.NewCollector)
+	c.addCollectorIfEnabledForDevice(device, "spanningtree", f.Stp, spanningtree.NewCollector)
 
 }
 
