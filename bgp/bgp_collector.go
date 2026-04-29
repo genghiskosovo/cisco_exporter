@@ -15,6 +15,7 @@ var (
 	receivedPrefixesDesc   *prometheus.Desc
 	advertisedPrefixesDesc *prometheus.Desc
 	bestPathsDesc          *prometheus.Desc
+	uptimeDesc             *prometheus.Desc
 )
 
 func init() {
@@ -23,6 +24,7 @@ func init() {
 	receivedPrefixesDesc = prometheus.NewDesc(prefix+"prefixes_received_count", "Number of received prefixes", l, nil)
 	advertisedPrefixesDesc = prometheus.NewDesc(prefix+"prefixes_advertised_count", "Number of advertised prefixes", l, nil)
 	bestPathsDesc = prometheus.NewDesc(prefix+"best_path_count", "Number of best paths from peer", l, nil)
+	uptimeDesc = prometheus.NewDesc(prefix+"uptime_seconds", "Duration in current BGP state (seconds). Uptime when session is up, downtime when down.", l, nil)
 }
 
 type bgpCollector struct {
@@ -44,6 +46,7 @@ func (*bgpCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- receivedPrefixesDesc
 	ch <- advertisedPrefixesDesc
 	ch <- bestPathsDesc
+	ch <- uptimeDesc
 }
 
 // Collect collects metrics from Cisco
@@ -61,6 +64,15 @@ func (c *bgpCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, 
 			return nil
 		}
 
+		// "show bgp neighbor" has no "down for X" field — get Up/Down durations
+		// from the summary table which always shows time in current state.
+		summaryDurations := make(map[string]float64)
+		if summaryOut, summaryErr := client.RunCommand("show bgp summary"); summaryErr == nil {
+			summaryDurations = c.ParseSummaryIOSXR(summaryOut)
+		} else if client.Debug {
+			log.Printf("show bgp summary for %s: %s\n", labelValues[0], summaryErr.Error())
+		}
+
 		for _, item := range items {
 			l := append(labelValues, item.Asn, item.Ip, item.Description)
 
@@ -69,10 +81,18 @@ func (c *bgpCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, 
 				up = 1
 			}
 
+			// Summary duration covers both uptime and downtime; fall back to
+			// neighbor uptime (only populated when Established) if not in summary.
+			uptime := item.UptimeSeconds
+			if d, ok := summaryDurations[item.Ip]; ok {
+				uptime = d
+			}
+
 			ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, float64(up), l...)
 			ch <- prometheus.MustNewConstMetric(receivedPrefixesDesc, prometheus.GaugeValue, float64(item.AcceptedPrefixes), l...)
 			ch <- prometheus.MustNewConstMetric(advertisedPrefixesDesc, prometheus.GaugeValue, float64(item.PrefixAdvertised), l...)
 			ch <- prometheus.MustNewConstMetric(bestPathsDesc, prometheus.GaugeValue, float64(item.BestPath), l...)
+			ch <- prometheus.MustNewConstMetric(uptimeDesc, prometheus.GaugeValue, uptime, l...)
 		}
 
 		return nil
@@ -103,6 +123,7 @@ func (c *bgpCollector) Collect(client *rpc.Client, ch chan<- prometheus.Metric, 
 		ch <- prometheus.MustNewConstMetric(receivedPrefixesDesc, prometheus.GaugeValue, float64(item.ReceivedPrefixes), l...)
 		ch <- prometheus.MustNewConstMetric(advertisedPrefixesDesc, prometheus.GaugeValue, 0, l...)
 		ch <- prometheus.MustNewConstMetric(bestPathsDesc, prometheus.GaugeValue, 0, l...)
+		ch <- prometheus.MustNewConstMetric(uptimeDesc, prometheus.GaugeValue, item.UptimeSeconds, l...)
 	}
 
 	return nil
