@@ -64,6 +64,11 @@ var transceiverRegexp = map[string]*regexp.Regexp{
 	rpc.IOSXE: regexp.MustCompile(`\s+Transceiver Tx power\s+= ((?:-)?\d+\.\d+).*\s*Transceiver Rx optical power\s+= ((?:-)?\d+\.\d+).*`),
 }
 
+// naSignalDBm is the sentinel value reported when a transceiver's current
+// power reads "N/A" (no signal). -40 dBm sits well below typical low-alarm
+// thresholds so dashboards flag it as a fault rather than a healthy reading.
+const naSignalDBm = -40.0
+
 var (
 	bulkIfaceRegexp  = regexp.MustCompile(`^(Ethernet\S+)`)
 	floatRegexp      = regexp.MustCompile(`-?\d+\.\d+`)
@@ -91,30 +96,45 @@ func (c *opticsCollector) ParseTransceiverBulk(output string) (map[string]Optics
 			hasTx, hasRx = false, false
 		} else if strings.Contains(line, "Tx Power") {
 			nums := floatRegexp.FindAllString(line, -1)
-			if len(nums) >= 1 {
+			// When the current measurement column is "N/A" (no signal), the
+			// floatRegexp skips it and the first number becomes the high-alarm
+			// threshold — which would otherwise be reported as the current power.
+			naCur := strings.Contains(line, "N/A")
+			thrOffset := 1
+			if naCur {
+				o.TxPower = naSignalDBm
+				hasTx = true
+				thrOffset = 0
+			} else if len(nums) >= 1 {
 				o.TxPower = util.Str2float64(nums[0])
 				hasTx = true
 			}
-			if len(nums) >= 5 {
+			if len(nums) >= thrOffset+4 {
 				// NX-OS order: current, high_alarm, low_alarm, high_warn, low_warn
-				o.TxHighAlarm = util.Str2float64(nums[1])
-				o.TxLowAlarm = util.Str2float64(nums[2])
-				o.TxHighWarn = util.Str2float64(nums[3])
-				o.TxLowWarn = util.Str2float64(nums[4])
+				o.TxHighAlarm = util.Str2float64(nums[thrOffset])
+				o.TxLowAlarm = util.Str2float64(nums[thrOffset+1])
+				o.TxHighWarn = util.Str2float64(nums[thrOffset+2])
+				o.TxLowWarn = util.Str2float64(nums[thrOffset+3])
 				o.HasThresholds = true
 			}
 		} else if strings.Contains(line, "Rx Power") {
 			nums := floatRegexp.FindAllString(line, -1)
-			if len(nums) >= 1 {
+			naCur := strings.Contains(line, "N/A")
+			thrOffset := 1
+			if naCur {
+				o.RxPower = naSignalDBm
+				hasRx = true
+				thrOffset = 0
+			} else if len(nums) >= 1 {
 				o.RxPower = util.Str2float64(nums[0])
 				hasRx = true
 			}
-			if len(nums) >= 5 {
+			if len(nums) >= thrOffset+4 {
 				// NX-OS order: current, high_alarm, low_alarm, high_warn, low_warn
-				o.RxHighAlarm = util.Str2float64(nums[1])
-				o.RxLowAlarm = util.Str2float64(nums[2])
-				o.RxHighWarn = util.Str2float64(nums[3])
-				o.RxLowWarn = util.Str2float64(nums[4])
+				o.RxHighAlarm = util.Str2float64(nums[thrOffset])
+				o.RxLowAlarm = util.Str2float64(nums[thrOffset+1])
+				o.RxHighWarn = util.Str2float64(nums[thrOffset+2])
+				o.RxLowWarn = util.Str2float64(nums[thrOffset+3])
 				o.HasThresholds = true
 			}
 		}
