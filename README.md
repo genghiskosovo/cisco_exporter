@@ -24,10 +24,48 @@ All metrics are enabled by default. To disable something pass a flag `--<name>.e
 Name     | Description | OS
 ---------|-------------|----
 bgp | BGP (message count, prefix counts per peer, session state) | IOS XE/NX-OS
+cdp | CDP neighbours (local interface, neighbour, neighbour interface) | NX-OS/IOS XE/IOS/IOS XR
 environment | Environment (temperatures, state of power supply) | NX-OS/IOS XE/IOS
 facts | System informations (OS Version, memory: total/used/free, cpu: 5s/1m/5m/interrupts) | IOS XE/IOS
 interfaces | Interfaces (transmitted/received: bytes/errors/drops, admin/oper state) | NX-OS (*_drops is always 0)/IOS XE/IOS
+lag | Port-channel membership (which physical ports are bundled into which aggregate) | NX-OS/IOS XE/IOS
 optics | Optical signals (tx/rx) | NX-OS/IOS XE/IOS
+stp | Spanning tree (per VLAN: port role, state, path cost, root bridge, bridge priority) | NX-OS/IOS XE/IOS
+
+## Topology metrics
+
+These three families exist to let a consumer reconstruct the network graph, and
+their names and label sets mirror [junos_exporter](../junos_exporter) one for
+one so a Cisco series and a Juniper series are interchangeable to a query.
+
+```
+cisco_cdp_neighbor{target, local_interface, neighbor, neighbor_interface}
+
+cisco_interface_lag_member{target, aggregate, member}
+
+cisco_stp_interface_role{target, vlan, interface, type}    1=Root 2=Desg 3=Altn 4=Bak 0=other
+cisco_stp_interface_status{target, vlan, interface, type}  1=FWD 2=BLK 3=LRN 4=LST 5=DIS 0=other
+cisco_stp_interface_cost{target, vlan, interface, type}
+cisco_stp_root_bridge{target, vlan}
+cisco_stp_bridge_priority{target, vlan}
+```
+
+**Spanning tree is per VLAN.** `show spanning-tree` prints one block per VLAN
+under PVST / rapid-PVST, so every series carries the VLAN it belongs to, and
+the `vlan` label holds the MST instance id on a device running MST instead.
+Which VLANs a trunk carries needs no separate metric: a port appears in a
+VLAN's block only while that VLAN is active on it.
+
+`cisco_stp_root_bridge` is read from the device's own Root ID / Bridge ID
+header rather than inferred from port roles. Inference — "has designated ports
+but no root port" — is wrong for any switch whose only trunk for a VLAN is
+down: it is then root of its own island and reports as root of the VLAN. It
+survives only as a fallback for an instance whose header does not parse.
+
+`cisco_interface_lag_member` is what maps a spanning-tree port named `Po5` onto
+a physical link, since CDP and interface descriptions only ever name physical
+ports. Every member the device lists is reported whatever its state flag;
+whether a member is up is already answered by `cisco_interface_up`.
 
 ## Install
 ```bash
@@ -72,10 +110,13 @@ devices:
 
 features:
   bgp: true
+  cdp: true
   environment: true
   facts: true
   interfaces: true
+  lag: true
   optics: true
+  stp: true
 
 ```
 

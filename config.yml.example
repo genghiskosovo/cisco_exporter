@@ -21,7 +21,10 @@ devices:
 
 features:
   bgp: true
+  cdp: true
   environment: true
   facts: true
   interfaces: true
+  lag: true
   optics: true
+  stp: true

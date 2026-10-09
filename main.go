@@ -36,6 +36,7 @@ var (
 	interfacesEnabled  = flag.Bool("interfaces.enabled", true, "Scrape interface metrics")
 	opticsEnabled      = flag.Bool("optics.enabled", true, "Scrape optic metrics")
 	stpEnabled         = flag.Bool("stp.enabled", true, "Scrape spanning tree metrics")
+	lagEnabled         = flag.Bool("lag.enabled", true, "Scrape port-channel membership metrics")
 	configFile         = flag.String("config.file", "", "Path to config file")
 	devices            []*connector.Device
 	cfg                *config.Config
@@ -117,6 +118,7 @@ func loadConfigFromFlags() *config.Config {
 	f.Interfaces = interfacesEnabled
 	f.Optics = opticsEnabled
 	f.Stp = stpEnabled
+	f.Lag = lagEnabled
 	return c
 }
 

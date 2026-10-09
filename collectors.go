@@ -9,6 +9,7 @@ import (
 	"github.com/lwlcom/cisco_exporter/environment"
 	"github.com/lwlcom/cisco_exporter/facts"
 	"github.com/lwlcom/cisco_exporter/interfaces"
+	"github.com/lwlcom/cisco_exporter/lag"
 	"github.com/lwlcom/cisco_exporter/optics"
 	"github.com/lwlcom/cisco_exporter/spanningtree"
 )
@@ -44,6 +45,7 @@ func (c *collectors) initCollectorsForDevice(device *connector.Device) {
 	c.addCollectorIfEnabledForDevice(device, "interfaces", f.Interfaces, interfaces.NewCollector)
 	c.addCollectorIfEnabledForDevice(device, "optics", f.Optics, optics.NewCollector)
 	c.addCollectorIfEnabledForDevice(device, "spanningtree", f.Stp, spanningtree.NewCollector)
+	c.addCollectorIfEnabledForDevice(device, "lag", f.Lag, lag.NewCollector)
 
 }
 

@@ -42,6 +42,7 @@ type FeatureConfig struct {
 	Interfaces  *bool `yaml:"interfaces,omitempty"`
 	Optics      *bool `yaml:"optics,omitempty"`
 	Stp         *bool `yaml:"stp"`
+	Lag         *bool `yaml:"lag"`
 }
 
 // New creates a new config
@@ -92,6 +93,9 @@ func Load(reader io.Reader) (*Config, error) {
 		if d.Features.Stp == nil {
 			d.Features.Stp = c.Features.Stp
 		}
+		if d.Features.Lag == nil {
+			d.Features.Lag = c.Features.Lag
+		}
 	}
 
 	return c, nil
@@ -118,6 +122,8 @@ func (c *Config) setDefaultValues() {
 	f.Optics = &optics
 	stp := true
 	f.Stp = &stp
+	lag := true
+	f.Lag = &lag
 }
 
 // DevicesFromTargets creates devices configs from targets list
